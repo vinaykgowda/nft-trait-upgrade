@@ -1,0 +1,7 @@
+# Vercel ignore file to ensure clean deployment
+node_modules
+.env.local
+.env.production
+keypair.json
+*.log
+.DS_Store

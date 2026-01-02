@@ -55,7 +55,13 @@ export class MetadataService {
       attributes: allAttributes,
       properties: {
         files: [], // Will be populated when image is uploaded
-        category: 'image'
+        category: 'image',
+        creators: [
+          {
+            address: process.env.NFT_CREATOR_ADDRESS || 'EE72RERKxoJFt61MFZSnWvztjD43zPDr2aVizkS41nLC',
+            share: 100
+          }
+        ]
       }
     };
   }
@@ -184,7 +190,7 @@ export class MetadataService {
 
     return metadata.attributes.map(attr => ({
       type: attr.trait_type,
-      value: attr.value
+      value: String(attr.value)
     }));
   }
 

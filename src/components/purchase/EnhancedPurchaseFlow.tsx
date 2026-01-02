@@ -251,7 +251,7 @@ export function EnhancedPurchaseFlow({ selectedNFT, selectedTraits, onSuccess, o
           assetId: selectedNFT.address,
           newImageUrl: newImageUrl,
           newAttributes: Object.values(selectedTraits).map(trait => ({
-            trait_type: trait.slotName || 'Unknown',
+            trait_type: trait.slotId, // Use slotId since slotName is not available
             value: trait.name
           })),
           txSignature: txSignature

@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
       // Add to attributes (even if Blank)
       completeAttributes.push({
         trait_type: slotName,
-        value: traitValue
+        value: String(traitValue)
       });
     });
 
@@ -133,7 +133,10 @@ export async function POST(request: NextRequest) {
         name: metadata.name,
         description: metadata.description,
         image: newImageUrl,
-        attributes: metadata.attributes
+        attributes: metadata.attributes.map(attr => ({
+          trait_type: attr.trait_type,
+          value: String(attr.value)
+        }))
       }
     );
 

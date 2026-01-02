@@ -70,7 +70,6 @@ export function PurchaseFlow({ selectedNFT, selectedTraits, onSuccess, onCancel 
       updateState({ step: 'building', progress: 50 });
       
       // Calculate payment details
-      const traits = Object.values(selectedTraits);
       let solTotal = 0;
       let ldzTotal = 0;
       

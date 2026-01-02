@@ -1,11 +1,11 @@
 'use client';
 
 import { TraitMarketplace } from '@/components/marketplace/TraitMarketplace';
-import { WalletProvider } from '@/components/wallet/WalletProvider';
+import { AppWalletProvider } from '@/components/wallet/WalletProvider';
 
 export default function MarketplacePage() {
   return (
-    <WalletProvider>
+    <AppWalletProvider>
       <div className="min-h-screen bg-gray-50">
         {/* Header */}
         <header className="bg-white shadow-sm border-b">
@@ -21,6 +21,6 @@ export default function MarketplacePage() {
         {/* Main Content */}
         <TraitMarketplace />
       </div>
-    </WalletProvider>
+    </AppWalletProvider>
   );
 }

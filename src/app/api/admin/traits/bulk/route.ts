@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
         const dbData = {
           ...traitRepo.fromDomain({
             ...traitData,
-            priceAmount: parseFloat(traitData.priceAmount), // Convert string to number for DECIMAL column
+            priceAmount: traitData.priceAmount, // Keep as string for DECIMAL column
             priceToken: { id: finalTokenId } as any, // Create minimal token object
           }),
           remaining_supply: traitData.totalSupply,

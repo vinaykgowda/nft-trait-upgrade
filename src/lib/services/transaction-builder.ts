@@ -20,12 +20,12 @@ import {
   some,
   none,
 } from '@metaplex-foundation/umi';
-import { createWeb3JsEdi } from '@metaplex-foundation/umi-web3js-adapters';
+import { fromWeb3JsKeypair } from '@metaplex-foundation/umi-web3js-adapters';
 import {
   updateV1,
   fetchAssetV1,
   AssetV1,
-  UpdateArgsV1,
+  UpdateArgs,
 } from '@metaplex-foundation/mpl-core';
 import { RPC_CONFIG } from '@/lib/constants';
 
@@ -63,7 +63,7 @@ export class TransactionBuilder {
     this.connection = new Connection(RPC_CONFIG.HELIUS_RPC_URL, 'confirmed');
     
     // Initialize UMI for Metaplex Core
-    this.umi = createUmi(RPC_CONFIG.HELIUS_RPC_URL);
+    this.umi = createUmi();
     
     // Initialize delegate keypair if private key is provided
     const delegatePrivateKey = process.env.SOLANA_DELEGATE_PRIVATE_KEY;
@@ -75,7 +75,7 @@ export class TransactionBuilder {
         // Set UMI identity
         this.umi.use({
           install: (umi: any) => {
-            umi.identity = createWeb3JsEdi(this.delegateKeypair!);
+            umi.identity = fromWeb3JsKeypair(this.delegateKeypair!);
           }
         });
       } catch (error) {
@@ -228,19 +228,10 @@ export class TransactionBuilder {
         updateAuthority: asset.updateAuthority.toString()
       });
 
-      // Prepare update arguments
-      const updateArgs: UpdateArgsV1 = {
-        name: some(asset.name), // Keep existing name
-        uri: some(newImageUrl), // Update with new image URL
-        // Note: Attributes are typically stored in the metadata JSON at the URI
-        // For Core assets, we update the URI to point to new metadata
-      };
-
       // Create update instruction using Metaplex Core SDK
       const updateIx = updateV1(this.umi, {
         asset: publicKey(assetId.toString()),
         authority: this.umi.identity, // Delegate authority
-        ...updateArgs,
       });
 
       // Convert UMI instruction to web3.js instruction

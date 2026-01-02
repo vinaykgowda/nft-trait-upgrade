@@ -60,25 +60,19 @@ export async function POST(request: NextRequest) {
       hasUpdate: validation.hasUpdateInstruction
     });
 
-    // Create purchase records for all traits in the reservation
-    const purchasePromises = reservation.traitIds.map(async (traitId) => {
-      const mockPurchaseData = {
-        walletAddress: reservation.walletAddress,
-        assetId: reservation.assetId,
-        traitId: traitId,
-        priceAmount: '1.0', // This should come from trait data
-        tokenId: 'sol-token-id', // This should come from trait data
-        treasuryWallet: process.env.TREASURY_WALLET || 'EE72RERKxoJFt61MFZSnWvztjD43zPDr2aVizkS41nLC',
-        status: 'tx_built' as const,
-      };
-
-      return mockPurchaseData;
-    });
-
-    const purchaseDataArray = await Promise.all(purchasePromises);
+    // Create purchase record for the trait in the reservation
+    const mockPurchaseData = {
+      walletAddress: reservation.walletAddress,
+      assetId: reservation.assetId,
+      traitId: reservation.traitId,
+      priceAmount: '1.0', // This should come from trait data
+      tokenId: 'sol-token-id', // This should come from trait data
+      treasuryWallet: process.env.TREASURY_WALLET || 'EE72RERKxoJFt61MFZSnWvztjD43zPDr2aVizkS41nLC',
+      status: 'tx_built' as const,
+    };
 
     // Consume the reservation and create purchase records
-    const consumeResult = await inventoryManager.consumeReservation(reservationId, purchaseDataArray[0]);
+    const consumeResult = await inventoryManager.consumeReservation(reservationId, mockPurchaseData);
     if (!consumeResult.success) {
       return NextResponse.json(
         { success: false, error: consumeResult.error || 'Failed to consume reservation' },

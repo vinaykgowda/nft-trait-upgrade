@@ -7,6 +7,13 @@ const loginSchema = z.object({
   password: z.string().min(1, 'Password is required'),
 });
 
+export async function GET() {
+  return NextResponse.json({ 
+    message: 'Admin login endpoint - use POST method',
+    status: 'available'
+  });
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Handle both JSON and form data

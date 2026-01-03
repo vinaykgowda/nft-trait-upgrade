@@ -6,10 +6,13 @@ keypair.json
 *.log
 .DS_Store
 
-# Next.js build cache and large files
-.next/cache
+# Next.js build cache and large files - be more aggressive
+.next/cache/**
 .next/trace
 .next/static/chunks/webpack*
+.next/static/chunks/polyfills*
+.next/server/chunks/webpack*
+.swc/
 .git
 tests/
 scripts/
@@ -22,3 +25,29 @@ database/
 jest.config.js
 jest.setup.js
 tsconfig.tsbuildinfo
+docker-compose.yml
+setup-quick.sh
+
+# Large documentation files
+BULK_UPLOAD_TOKEN_FIX.md
+COMPLETE_END_TO_END_IMPLEMENTATION.md
+COMPLETE_METADATA_WITH_CREATORS.md
+DEPLOYMENT.md
+DYNAMIC_TOKEN_SYSTEM_SUMMARY.md
+ENHANCED_NFT_PREVIEW_SYSTEM.md
+LOCAL_DEVELOPMENT.md
+METADATA_SYSTEM_FINAL_STATUS.md
+METADATA_SYSTEM_SUMMARY.md
+PAYMENT_CALCULATION_FIX_SUMMARY.md
+PEPE_GODS_V2_METADATA_COMPLETE.md
+PRODUCTION_CHECKLIST.md
+PRODUCTION_SETUP.md
+SEQUENTIAL_PAYMENT_FLOW_COMPLETE.md
+SLOT_ID_FOREIGN_KEY_FIX.md
+SOLANA_PAYMENT_IMPLEMENTATION_STATUS.md
+TESTING_ENHANCED_PREVIEW.md
+TESTING_METADATA_UPDATES.md
+TOKEN_MANAGER_GUIDE.md
+TRAIT_MANAGEMENT_SUMMARY.md
+TRAIT_SYSTEM_COMPLETE_SUMMARY.md
+VERCEL_DEPLOYMENT.md

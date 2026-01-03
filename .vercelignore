@@ -6,29 +6,33 @@ keypair.json
 *.log
 .DS_Store
 
-# Next.js build cache and large files - be more aggressive
-.next/cache/**
-.next/trace
+# Next.js build cache and large files - AGGRESSIVE EXCLUSION
+.next/cache/**/*
+.next/trace/**/*
 .next/static/chunks/webpack*
 .next/static/chunks/polyfills*
 .next/server/chunks/webpack*
-.swc/
-.git
-tests/
-scripts/
-uploads/
-database/
+.swc/**/*
+.git/**/*
+
+# Development and testing files
+tests/**/*
+scripts/**/*
+uploads/**/*
+database/**/*
+
+# Documentation files (keep only README.md)
 *.md
 !README.md
 
-# Development files
+# Development configuration
 jest.config.js
 jest.setup.js
 tsconfig.tsbuildinfo
 docker-compose.yml
 setup-quick.sh
 
-# Large documentation files
+# Specific large documentation files
 BULK_UPLOAD_TOKEN_FIX.md
 COMPLETE_END_TO_END_IMPLEMENTATION.md
 COMPLETE_METADATA_WITH_CREATORS.md

@@ -6,11 +6,8 @@ const nextConfig = {
   images: {
     domains: ['arweave.net', 'gateway.irys.xyz'],
   },
-  // Optimize build output
-  output: 'standalone',
-  compress: true,
-  poweredByHeader: false,
-  generateEtags: false,
+  // Disable caching to reduce bundle size
+  generateBuildId: () => 'build-' + Date.now(),
   
   webpack: (config, { isServer }) => {
     config.resolve.fallback = {
@@ -27,20 +24,8 @@ const nextConfig = {
       };
     }
     
-    // Optimize bundle size
-    config.optimization = {
-      ...config.optimization,
-      splitChunks: {
-        chunks: 'all',
-        cacheGroups: {
-          vendor: {
-            test: /[\\/]node_modules[\\/]/,
-            name: 'vendors',
-            chunks: 'all',
-          },
-        },
-      },
-    };
+    // Disable webpack cache to reduce size
+    config.cache = false;
     
     return config;
   }

@@ -5,3 +5,20 @@ node_modules
 keypair.json
 *.log
 .DS_Store
+
+# Next.js build cache and large files
+.next/cache
+.next/trace
+.next/static/chunks/webpack*
+.git
+tests/
+scripts/
+uploads/
+database/
+*.md
+!README.md
+
+# Development files
+jest.config.js
+jest.setup.js
+tsconfig.tsbuildinfo

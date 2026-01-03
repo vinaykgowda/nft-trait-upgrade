@@ -1,4 +1,16 @@
 {
   "version": 2,
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "buildCommand": "npm run build:clean",
+  "build": {
+    "env": {
+      "NEXT_TELEMETRY_DISABLED": "1",
+      "DISABLE_WEBPACK_CACHE": "true"
+    }
+  },
+  "functions": {
+    "src/app/api/**/*.ts": {
+      "maxDuration": 30
+    }
+  }
 }

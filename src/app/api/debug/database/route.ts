@@ -8,7 +8,9 @@ export async function GET() {
     if (!databaseUrl) {
       return NextResponse.json({
         error: 'DATABASE_URL not found',
-        env: Object.keys(process.env).filter(key => key.includes('DATABASE'))
+        env: Object.keys(process.env).filter(key => key.includes('DATABASE')),
+        allEnvKeys: Object.keys(process.env).length,
+        nodeEnv: process.env.NODE_ENV
       });
     }
 
@@ -33,7 +35,8 @@ export async function GET() {
       error: 'Database connection failed',
       details: error instanceof Error ? error.message : 'Unknown error',
       databaseUrlExists: !!process.env.DATABASE_URL,
-      databaseUrlLength: process.env.DATABASE_URL?.length || 0
+      databaseUrlLength: process.env.DATABASE_URL?.length || 0,
+      nodeEnv: process.env.NODE_ENV
     }, { status: 500 });
   }
 }

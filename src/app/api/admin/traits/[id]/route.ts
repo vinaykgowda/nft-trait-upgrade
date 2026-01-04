@@ -164,9 +164,8 @@ export async function PUT(
     } else {
       console.log(`✅ Using main token ID: ${priceTokenId}`);
     }
-    // Map category to slot ID - look up from database instead of hardcoding
-    const { query } = await import('@/lib/database');
     
+    // Map category to slot ID - look up from database instead of hardcoding
     // Get the actual slot ID for this category
     const slotResult = await query(`
       SELECT id FROM trait_slots 

@@ -111,6 +111,12 @@ export async function POST(request: NextRequest) {
     } catch (irysError) {
       console.error('❌ Irys upload failed, falling back to Vercel Blob:', irysError);
       
+      // Check if it's a balance issue
+      const errorMessage = irysError instanceof Error ? irysError.message : 'Unknown error';
+      if (errorMessage.includes('balance') || errorMessage.includes('insufficient')) {
+        console.warn('⚠️ Irys balance insufficient, using Vercel Blob as fallback');
+      }
+      
       // Fallback to Vercel Blob if Irys fails
       if (!process.env.BLOB_READ_WRITE_TOKEN) {
         throw new Error('Both Irys and Vercel Blob are unavailable');
@@ -132,7 +138,8 @@ export async function POST(request: NextRequest) {
         imageUrl: blob.url,
         uploadId: blob.pathname,
         size: buffer.length,
-        storage: 'vercel-blob-fallback'
+        storage: 'vercel-blob-fallback',
+        irysError: errorMessage
       });
     }
 

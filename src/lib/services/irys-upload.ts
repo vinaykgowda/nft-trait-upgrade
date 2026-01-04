@@ -1,4 +1,5 @@
 import { Keypair } from '@solana/web3.js';
+import Irys from '@irys/sdk';
 
 export interface IrysUploadResult {
   id: string;
@@ -33,11 +34,29 @@ export interface NFTMetadata {
 export class IrysUploadService {
   private irysUrl: string;
   private keypair: Keypair;
+  private irysClient: Irys | null = null;
 
   constructor(keypair: Keypair, irysUrl?: string) {
     this.keypair = keypair;
-    // Use devnet Irys for testing
+    // Use devnet Irys for testing, mainnet for production
     this.irysUrl = irysUrl || process.env.IRYS_NODE_URL || 'https://devnet.irys.xyz';
+  }
+
+  private async getIrysClient(): Promise<Irys> {
+    if (!this.irysClient) {
+      try {
+        this.irysClient = new Irys({
+          url: this.irysUrl,
+          token: 'solana',
+          key: this.keypair.secretKey,
+        });
+        console.log(`🔗 Connected to Irys: ${this.irysUrl}`);
+      } catch (error) {
+        console.error('❌ Failed to initialize Irys client:', error);
+        throw new Error(`Irys initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    }
+    return this.irysClient;
   }
 
   /**
@@ -53,22 +72,43 @@ export class IrysUploadService {
       console.log(`   - Content-Type: ${contentType}`);
       console.log(`   - Public Key: ${this.keypair.publicKey.toString()}`);
 
-      // For testing purposes, we'll simulate the upload
-      // In production, you would use the actual Irys SDK
-      const mockId = 'mock_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-      const mockUrl = `${this.irysUrl}/${mockId}`;
+      const irys = await this.getIrysClient();
 
-      console.log(`✅ Mock upload successful`);
-      console.log(`   - ID: ${mockId}`);
-      console.log(`   - URL: ${mockUrl}`);
+      // Check balance before upload
+      const balance = await irys.getLoadedBalance();
+      console.log(`💰 Current Irys balance: ${balance} atomic units`);
+
+      // Estimate cost
+      const price = await irys.getPrice(imageBuffer.length);
+      console.log(`💸 Upload cost estimate: ${price} atomic units`);
+
+      if (balance.lt(price)) {
+        console.warn('⚠️ Insufficient balance for upload, but attempting anyway...');
+      }
+
+      // Upload the image
+      const response = await irys.upload(imageBuffer, {
+        tags: [
+          { name: 'Content-Type', value: contentType },
+          { name: 'Application', value: 'NFT-Trait-Marketplace' },
+          { name: 'Type', value: 'image' },
+          { name: 'Timestamp', value: Date.now().toString() }
+        ]
+      });
+
+      const uploadUrl = `${this.irysUrl}/${response.id}`;
+
+      console.log(`✅ Image uploaded to Irys successfully`);
+      console.log(`   - ID: ${response.id}`);
+      console.log(`   - URL: ${uploadUrl}`);
       
       return {
-        id: mockId,
-        url: mockUrl,
+        id: response.id,
+        url: uploadUrl,
         size: imageBuffer.length
       };
     } catch (error) {
-      console.error('Error uploading image to Irys:', error);
+      console.error('❌ Error uploading image to Irys:', error);
       throw new Error(`Image upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -85,21 +125,31 @@ export class IrysUploadService {
       console.log(`   - Size: ${metadataBuffer.length} bytes`);
       console.log(`   - Metadata:`, metadata);
 
-      // For testing purposes, we'll simulate the upload
-      const mockId = 'metadata_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-      const mockUrl = `${this.irysUrl}/${mockId}`;
+      const irys = await this.getIrysClient();
 
-      console.log(`✅ Mock metadata upload successful`);
-      console.log(`   - ID: ${mockId}`);
-      console.log(`   - URL: ${mockUrl}`);
+      // Upload the metadata
+      const response = await irys.upload(metadataBuffer, {
+        tags: [
+          { name: 'Content-Type', value: 'application/json' },
+          { name: 'Application', value: 'NFT-Trait-Marketplace' },
+          { name: 'Type', value: 'metadata' },
+          { name: 'Timestamp', value: Date.now().toString() }
+        ]
+      });
+
+      const uploadUrl = `${this.irysUrl}/${response.id}`;
+
+      console.log(`✅ Metadata uploaded to Irys successfully`);
+      console.log(`   - ID: ${response.id}`);
+      console.log(`   - URL: ${uploadUrl}`);
       
       return {
-        id: mockId,
-        url: mockUrl,
+        id: response.id,
+        url: uploadUrl,
         size: metadataBuffer.length
       };
     } catch (error) {
-      console.error('Error uploading metadata to Irys:', error);
+      console.error('❌ Error uploading metadata to Irys:', error);
       throw new Error(`Metadata upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -141,7 +191,7 @@ export class IrysUploadService {
         metadataResult
       };
     } catch (error) {
-      console.error('Error uploading image and metadata:', error);
+      console.error('❌ Error uploading image and metadata:', error);
       throw error;
     }
   }
@@ -152,9 +202,10 @@ export class IrysUploadService {
   async checkResourceExists(id: string): Promise<boolean> {
     try {
       console.log(`🔍 Checking if resource exists: ${id}`);
-      // For testing, always return true for mock IDs
-      return id.startsWith('mock_') || id.startsWith('metadata_');
+      const response = await fetch(`${this.irysUrl}/${id}`, { method: 'HEAD' });
+      return response.ok;
     } catch (error) {
+      console.error('❌ Error checking resource existence:', error);
       return false;
     }
   }
@@ -162,14 +213,39 @@ export class IrysUploadService {
   /**
    * Gets the balance for the current keypair
    */
-  async getBalance(): Promise<number> {
+  async getBalance(): Promise<string> {
     try {
       console.log(`💰 Getting balance for: ${this.keypair.publicKey.toString()}`);
-      // For testing, return a mock balance
-      return 1000000; // 1 SOL in lamports
+      const irys = await this.getIrysClient();
+      const balance = await irys.getLoadedBalance();
+      return balance.toString();
     } catch (error) {
-      console.error('Error getting Irys balance:', error);
+      console.error('❌ Error getting Irys balance:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Fund the Irys account with SOL
+   */
+  async fundAccount(amount: number): Promise<{ success: boolean; txId?: string; error?: string }> {
+    try {
+      console.log(`💸 Funding Irys account with ${amount} SOL`);
+      const irys = await this.getIrysClient();
+      
+      // Convert SOL to atomic units (lamports)
+      const atomicAmount = irys.token.toAtomic(amount);
+      
+      const response = await irys.fund(atomicAmount);
+      
+      console.log(`✅ Account funded successfully: ${response.id}`);
+      return { success: true, txId: response.id };
+    } catch (error) {
+      console.error('❌ Error funding account:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      };
     }
   }
 }

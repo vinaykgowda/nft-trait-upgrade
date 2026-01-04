@@ -5,7 +5,6 @@ import {
   TransactionInstruction,
   SystemProgram,
   Keypair,
-  sendAndConfirmTransaction,
 } from '@solana/web3.js';
 import { 
   createTransferInstruction,
@@ -380,15 +379,23 @@ export class TransactionBuilder {
       
       console.log('📡 Sending transaction to Solana network...');
       
-      const signature = await sendAndConfirmTransaction(
-        this.connection,
-        transaction,
-        [], // Signers already added via partialSign
-        {
-          commitment: 'confirmed',
-          maxRetries: 3,
-        }
-      );
+      // The transaction is already fully signed by the user
+      // Use sendRawTransaction instead of sendAndConfirmTransaction
+      const rawTransaction = transaction.serialize();
+      const signature = await this.connection.sendRawTransaction(rawTransaction, {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
+        maxRetries: 3,
+      });
+
+      console.log('📡 Transaction sent, waiting for confirmation:', signature);
+
+      // Wait for confirmation
+      const confirmation = await this.connection.confirmTransaction(signature, 'confirmed');
+      
+      if (confirmation.value.err) {
+        throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+      }
 
       console.log('✅ Transaction confirmed:', signature);
 

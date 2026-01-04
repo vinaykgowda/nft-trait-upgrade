@@ -22,9 +22,16 @@ export async function POST(request: NextRequest) {
       throw new Error('UPDATE_AUTHORITY_PRIVATE_KEY not configured');
     }
 
-    const updateKeypair = Keypair.fromSecretKey(
-      new Uint8Array(JSON.parse(updatePrivateKey))
-    );
+    const updateKeypair = (() => {
+      if (updatePrivateKey.startsWith('[') && updatePrivateKey.endsWith(']')) {
+        // JSON array format: [123, 45, 67, ...]
+        return Keypair.fromSecretKey(new Uint8Array(JSON.parse(updatePrivateKey)));
+      } else {
+        // Base58 string format
+        const bs58 = require('bs58');
+        return Keypair.fromSecretKey(bs58.decode(updatePrivateKey));
+      }
+    })();
 
     // Get Solana connection
     const rpcUrl = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';

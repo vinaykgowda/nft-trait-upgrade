@@ -22,9 +22,16 @@ export async function POST(request: NextRequest) {
       throw new Error('IRYS_PRIVATE_KEY not configured');
     }
 
-    const keypair = Keypair.fromSecretKey(
-      new Uint8Array(JSON.parse(uploadPrivateKey))
-    );
+    const keypair = (() => {
+      if (uploadPrivateKey.startsWith('[') && uploadPrivateKey.endsWith(']')) {
+        // JSON array format: [123, 45, 67, ...]
+        return Keypair.fromSecretKey(new Uint8Array(JSON.parse(uploadPrivateKey)));
+      } else {
+        // Base58 string format
+        const bs58 = require('bs58');
+        return Keypair.fromSecretKey(bs58.decode(uploadPrivateKey));
+      }
+    })();
 
     // Upload to Irys
     const irysService = new IrysUploadService(keypair);

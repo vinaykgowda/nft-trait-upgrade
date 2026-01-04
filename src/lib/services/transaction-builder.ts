@@ -69,7 +69,18 @@ export class TransactionBuilder {
     const delegatePrivateKey = process.env.SOLANA_DELEGATE_PRIVATE_KEY;
     if (delegatePrivateKey) {
       try {
-        const privateKeyBytes = Uint8Array.from(JSON.parse(delegatePrivateKey));
+        let privateKeyBytes: Uint8Array;
+        
+        // Handle both JSON array format and base58 string format
+        if (delegatePrivateKey.startsWith('[') && delegatePrivateKey.endsWith(']')) {
+          // JSON array format: [123, 45, 67, ...]
+          privateKeyBytes = Uint8Array.from(JSON.parse(delegatePrivateKey));
+        } else {
+          // Base58 string format
+          const bs58 = await import('bs58');
+          privateKeyBytes = bs58.default.decode(delegatePrivateKey);
+        }
+        
         this.delegateKeypair = Keypair.fromSecretKey(privateKeyBytes);
         
         // Set UMI identity
@@ -78,6 +89,8 @@ export class TransactionBuilder {
             umi.identity = fromWeb3JsKeypair(this.delegateKeypair!);
           }
         });
+        
+        console.log('✅ Delegate keypair initialized successfully');
       } catch (error) {
         console.error('Failed to initialize delegate keypair:', error);
       }

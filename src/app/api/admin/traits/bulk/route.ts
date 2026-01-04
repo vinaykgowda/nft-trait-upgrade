@@ -109,48 +109,27 @@ export async function POST(request: NextRequest) {
           const mainTokenCheck = await query('SELECT id FROM tokens WHERE id = $1', [traitData.priceTokenId]);
           
           if (mainTokenCheck.rows.length === 0) {
-            // Not a main token ID, check if it's a project token ID
-            const projectTokenCheck = await query(`
-              SELECT token_address, token_symbol 
-              FROM project_tokens 
-              WHERE id = $1
-            `, [traitData.priceTokenId]);
+            // Not a main token ID, let's try to find SOL token as fallback
+            console.log(`⚠️ Token ID ${traitData.priceTokenId} not found, checking for SOL token as fallback`);
             
-            if (projectTokenCheck.rows.length > 0) {
-              const projectToken = projectTokenCheck.rows[0];
-              
-              // Find corresponding main token by address/symbol
-              const mainTokenLookup = await query(`
-                SELECT id FROM tokens 
-                WHERE mint_address = $1 OR symbol = $2
-              `, [projectToken.token_address, projectToken.token_symbol]);
-              
-              if (mainTokenLookup.rows.length > 0) {
-                finalTokenId = mainTokenLookup.rows[0].id;
-                console.log(`🔄 Converted project token ${traitData.priceTokenId} to main token ${finalTokenId}`);
-              } else {
-                throw new Error(`Token not found in main tokens table: ${projectToken.token_symbol}`);
-              }
+            const solTokenResult = await query('SELECT id FROM tokens WHERE symbol = $1', ['SOL']);
+            
+            if (solTokenResult.rows.length === 0) {
+              // No SOL token exists, create it
+              console.log('🔧 Creating missing SOL token...');
+              const createSolResult = await query(`
+                INSERT INTO tokens (symbol, mint_address, decimals, enabled) 
+                VALUES ('SOL', NULL, 9, TRUE) 
+                RETURNING id
+              `);
+              finalTokenId = createSolResult.rows[0].id;
+              console.log(`✅ Created SOL token with ID: ${finalTokenId}`);
             } else {
-              // Check if it's a token address (legacy support)
-              if (traitData.priceTokenId === 'So11111111111111111111111111111111111111112') {
-                // This is SOL address, get the SOL token ID from database
-                let solTokenResult = await query('SELECT id FROM tokens WHERE symbol = $1', ['SOL']);
-                if (solTokenResult.rows.length === 0) {
-                  throw new Error('SOL token not found in database. Please ensure tokens are properly initialized.');
-                } else {
-                  finalTokenId = solTokenResult.rows[0].id;
-                }
-              } else {
-                // Try to look it up as a mint address
-                const tokenResult = await query('SELECT id FROM tokens WHERE mint_address = $1', [traitData.priceTokenId]);
-                if (tokenResult.rows.length > 0) {
-                  finalTokenId = tokenResult.rows[0].id;
-                } else {
-                  throw new Error(`Invalid token ID or address: ${traitData.priceTokenId}`);
-                }
-              }
+              finalTokenId = solTokenResult.rows[0].id;
+              console.log(`🔄 Using SOL token as fallback: ${finalTokenId}`);
             }
+          } else {
+            console.log(`✅ Token ID ${traitData.priceTokenId} found in database`);
           }
         }
 

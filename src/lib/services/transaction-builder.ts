@@ -77,8 +77,8 @@ export class TransactionBuilder {
           privateKeyBytes = Uint8Array.from(JSON.parse(delegatePrivateKey));
         } else {
           // Base58 string format
-          const bs58 = await import('bs58');
-          privateKeyBytes = bs58.default.decode(delegatePrivateKey);
+          const bs58 = require('bs58');
+          privateKeyBytes = bs58.decode(delegatePrivateKey);
         }
         
         this.delegateKeypair = Keypair.fromSecretKey(privateKeyBytes);

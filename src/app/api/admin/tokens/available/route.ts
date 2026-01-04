@@ -13,15 +13,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
     }
 
-    // Get all available tokens from main tokens table
-    const mainTokensResult = await query(`
-      SELECT id, symbol, mint_address, decimals, enabled
-      FROM tokens 
-      WHERE enabled = TRUE
-      ORDER BY symbol
-    `);
-
-    // Get project tokens as fallback
+    // PRIMARY: Get project tokens (this is where your actual tokens are)
     const projectTokensResult = await query(`
       SELECT id, token_address, token_name, token_symbol, decimals, enabled
       FROM project_tokens 
@@ -29,23 +21,31 @@ export async function GET(request: NextRequest) {
       ORDER BY token_symbol
     `);
 
+    // SECONDARY: Get main tokens as additional options
+    const mainTokensResult = await query(`
+      SELECT id, symbol, mint_address, decimals, enabled
+      FROM tokens 
+      WHERE enabled = TRUE
+      ORDER BY symbol
+    `);
+
     console.log('🔍 Token fetch results:', {
-      mainTokens: mainTokensResult.rows.length,
       projectTokens: projectTokensResult.rows.length,
-      mainTokensData: mainTokensResult.rows,
-      projectTokensData: projectTokensResult.rows
+      mainTokens: mainTokensResult.rows.length,
+      projectTokensData: projectTokensResult.rows,
+      mainTokensData: mainTokensResult.rows
     });
 
     const tokens: any[] = [];
 
-    // Add main tokens (preferred)
-    mainTokensResult.rows.forEach((row: any) => {
+    // Add project tokens FIRST (these are your primary tokens)
+    projectTokensResult.rows.forEach((row: any) => {
       tokens.push({
         id: row.id,
         projectId: '',
-        tokenAddress: row.mint_address || 'So11111111111111111111111111111111111111112', // SOL address for null mint_address
-        tokenName: row.symbol === 'SOL' ? 'Solana' : row.symbol,
-        tokenSymbol: row.symbol,
+        tokenAddress: row.token_address,
+        tokenName: row.token_name,
+        tokenSymbol: row.token_symbol,
         decimals: row.decimals,
         enabled: row.enabled,
         createdAt: new Date().toISOString(),
@@ -53,17 +53,17 @@ export async function GET(request: NextRequest) {
       });
     });
 
-    // ALWAYS add project tokens as well (not just fallback)
-    projectTokensResult.rows.forEach((row: any) => {
+    // Add main tokens as additional options (avoid duplicates)
+    mainTokensResult.rows.forEach((row: any) => {
       // Avoid duplicates by checking if token symbol already exists
-      const existingToken = tokens.find(t => t.tokenSymbol === row.token_symbol);
+      const existingToken = tokens.find(t => t.tokenSymbol === row.symbol);
       if (!existingToken) {
         tokens.push({
           id: row.id,
           projectId: '',
-          tokenAddress: row.token_address,
-          tokenName: row.token_name,
-          tokenSymbol: row.token_symbol,
+          tokenAddress: row.mint_address || 'So11111111111111111111111111111111111111112', // SOL address for null mint_address
+          tokenName: row.symbol === 'SOL' ? 'Solana' : row.symbol,
+          tokenSymbol: row.symbol,
           decimals: row.decimals,
           enabled: row.enabled,
           createdAt: new Date().toISOString(),

@@ -97,7 +97,9 @@ export async function POST(request: NextRequest) {
         return apiResponse.error(`Token information not found for trait ${trait.name}`, 400);
       }
 
-      const amount = Number(trait.price_amount);
+      // The price_amount is already in human-readable format (e.g., "100" for 100 LDZ)
+      // No need for decimal conversion here
+      const amount = parseFloat(trait.price_amount);
       if (trait.token_symbol === 'SOL') {
         solTotal += amount;
       } else if (trait.token_symbol === 'LDZ') {
@@ -214,8 +216,8 @@ export async function POST(request: NextRequest) {
       return apiResponse.error(`Transaction validation failed: ${validation.error}`, 500);
     }
 
-    // Simulate the transaction (temporarily disabled to debug account issues)
-    if (false && process.env.NODE_ENV === 'production') {
+    // Simulate the transaction (disabled for debugging account issues)
+    if (false) {
       const simulation = await transactionBuilder.simulateTransaction(partiallySignedTransaction.transaction);
       if (!simulation.success) {
         return apiResponse.error(`Transaction simulation failed: ${simulation.error}`, 400);

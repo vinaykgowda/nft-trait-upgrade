@@ -31,44 +31,45 @@ export class ConfigService {
       return this.config;
     }
 
-    // Try to get from database first (dynamic)
-    try {
-      const projects = await this.projectRepo.findAll();
-      const project = projects[0]; // Use first project for now
-
-      if (project) {
-        this.config = {
-          treasuryWallet: project.treasury_wallet,
-          collectionIds: project.collection_ids,
-          nftCreatorAddress: process.env.NFT_CREATOR_ADDRESS || project.treasury_wallet,
-          nftCollectionSymbol: process.env.NFT_COLLECTION_SYMBOL || 'PGV2',
-          nftSellerFeeBasisPoints: parseInt(process.env.NFT_SELLER_FEE_BASIS_POINTS || '690'),
-          solTokenMint: undefined, // SOL doesn't have a mint address
-          ldzTokenMint: process.env.LDZ_TOKEN_MINT,
-        };
-        return this.config;
-      }
-    } catch (error) {
-      console.warn('Failed to load config from database, using environment variables:', error);
-    }
-
-    // Fallback to environment variables
+    // Primary source: Environment variables (always required)
     this.config = {
       treasuryWallet: process.env.TREASURY_WALLET!,
       collectionIds: process.env.COLLECTION_IDS?.split(',') || [],
       nftCreatorAddress: process.env.NFT_CREATOR_ADDRESS!,
       nftCollectionSymbol: process.env.NFT_COLLECTION_SYMBOL || 'PGV2',
       nftSellerFeeBasisPoints: parseInt(process.env.NFT_SELLER_FEE_BASIS_POINTS || '690'),
-      solTokenMint: undefined,
+      solTokenMint: undefined, // SOL doesn't have a mint address
       ldzTokenMint: process.env.LDZ_TOKEN_MINT,
     };
 
     // Validate required fields
     if (!this.config.treasuryWallet) {
-      throw new Error('TREASURY_WALLET is required in environment variables or database');
+      throw new Error('TREASURY_WALLET is required in environment variables');
     }
     if (!this.config.nftCreatorAddress) {
       throw new Error('NFT_CREATOR_ADDRESS is required in environment variables');
+    }
+    if (!this.config.ldzTokenMint) {
+      throw new Error('LDZ_TOKEN_MINT is required in environment variables');
+    }
+
+    // Optional enhancement: Try to get additional data from database
+    try {
+      const projects = await this.projectRepo.findAll();
+      const project = projects[0]; // Use first project if available
+
+      if (project) {
+        // Override with database values if they exist and are different
+        if (project.treasury_wallet && project.treasury_wallet !== this.config.treasuryWallet) {
+          console.log(`Using database treasury wallet: ${project.treasury_wallet}`);
+          this.config.treasuryWallet = project.treasury_wallet;
+        }
+        if (project.collection_ids && project.collection_ids.length > 0) {
+          this.config.collectionIds = project.collection_ids;
+        }
+      }
+    } catch (error) {
+      console.warn('Could not load additional config from database (this is optional):', error);
     }
 
     return this.config;

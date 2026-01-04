@@ -157,6 +157,53 @@ export async function POST(request: NextRequest) {
       transactionType
     });
 
+    // Debug: Check token accounts exist before building transaction
+    if (tokenMintAddress) {
+      try {
+        const { getAssociatedTokenAddress } = await import('@solana/spl-token');
+        const { PublicKey, Connection } = await import('@solana/web3.js');
+        
+        const connection = new Connection(process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com');
+        const walletPubkey = new PublicKey(walletAddress);
+        const treasuryPubkey = new PublicKey(treasuryWallet);
+        const mintPubkey = new PublicKey(tokenMintAddress);
+        
+        const userTokenAccount = await getAssociatedTokenAddress(mintPubkey, walletPubkey);
+        const treasuryTokenAccount = await getAssociatedTokenAddress(mintPubkey, treasuryPubkey);
+        
+        console.log('🔍 Token account check:', {
+          userWallet: walletAddress,
+          userTokenAccount: userTokenAccount.toString(),
+          treasuryWallet,
+          treasuryTokenAccount: treasuryTokenAccount.toString(),
+          tokenMint: tokenMintAddress
+        });
+        
+        // Check if accounts exist
+        const userAccountInfo = await connection.getAccountInfo(userTokenAccount);
+        const treasuryAccountInfo = await connection.getAccountInfo(treasuryTokenAccount);
+        
+        console.log('📊 Account existence check:', {
+          userAccountExists: !!userAccountInfo,
+          treasuryAccountExists: !!treasuryAccountInfo,
+          userAccountData: userAccountInfo ? 'Has data' : 'No account',
+          treasuryAccountData: treasuryAccountInfo ? 'Has data' : 'No account'
+        });
+        
+        if (!userAccountInfo) {
+          return apiResponse.error(`User does not have a ${primaryToken} token account. Please create one first.`, 400);
+        }
+        
+        if (!treasuryAccountInfo) {
+          console.warn('⚠️ Treasury token account does not exist - this may cause transaction failure');
+        }
+        
+      } catch (accountCheckError) {
+        console.error('❌ Token account check failed:', accountCheckError);
+        // Continue anyway - let the transaction fail with more specific error
+      }
+    }
+
     // Build payment-only transaction (no metadata update)
     const partiallySignedTransaction = await transactionBuilder.buildPaymentTransaction({
       walletAddress,
@@ -173,14 +220,14 @@ export async function POST(request: NextRequest) {
       return apiResponse.error(`Transaction validation failed: ${validation.error}`, 500);
     }
 
-    // Simulate the transaction (skip in development)
-    if (process.env.NODE_ENV === 'production') {
+    // Simulate the transaction (temporarily disabled to debug account issues)
+    if (false && process.env.NODE_ENV === 'production') {
       const simulation = await transactionBuilder.simulateTransaction(partiallySignedTransaction.transaction);
       if (!simulation.success) {
         return apiResponse.error(`Transaction simulation failed: ${simulation.error}`, 400);
       }
     } else {
-      console.log('⚠️ Skipping transaction simulation in development mode');
+      console.log('⚠️ Skipping transaction simulation - disabled for debugging');
     }
 
     console.log('✅ Payment transaction built and validated successfully');

@@ -161,9 +161,9 @@ export class InventoryManager {
         // Create purchase record
         const purchase = await this.purchaseRepo.create({
           ...purchaseData,
-          wallet_address: consumedReservation.wallet_address,
-          asset_id: consumedReservation.asset_id,
-          trait_id: consumedReservation.trait_id,
+          walletAddress: consumedReservation.wallet_address,
+          assetId: consumedReservation.asset_id,
+          traitId: consumedReservation.trait_id,
           status: 'created',
         }, client);
 

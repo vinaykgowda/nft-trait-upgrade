@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Pool } from 'pg';
-import * as argon2 from 'argon2';
+import * as bcrypt from 'bcryptjs';
 
 export async function POST(request: NextRequest) {
   try {
@@ -35,12 +35,7 @@ export async function POST(request: NextRequest) {
 
     // Hash the password
     console.log('Hashing password...');
-    const passwordHash = await argon2.hash(password, {
-      type: argon2.argon2id,
-      memoryCost: 2 ** 16,
-      timeCost: 3,
-      parallelism: 1,
-    });
+    const passwordHash = await bcrypt.hash(password, 12);
     console.log('Password hashed successfully');
 
     // Create the admin user

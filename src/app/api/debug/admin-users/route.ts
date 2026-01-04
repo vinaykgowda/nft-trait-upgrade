@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { Pool } from 'pg';
-import * as argon2 from 'argon2';
+import * as bcrypt from 'bcryptjs';
 
 export async function GET() {
   try {
@@ -54,7 +54,7 @@ export async function POST() {
     // Create a default admin user
     const username = 'admin';
     const password = 'admin123'; // Change this in production!
-    const passwordHash = await argon2.hash(password);
+    const passwordHash = await bcrypt.hash(password, 12);
 
     const result = await pool.query(`
       INSERT INTO admin_users (username, password_hash, roles, created_at, updated_at)

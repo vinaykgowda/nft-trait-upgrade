@@ -1,16 +1,11 @@
-import * as argon2 from 'argon2';
+import * as bcrypt from 'bcryptjs';
 
 export class PasswordService {
-  private static readonly ARGON2_OPTIONS = {
-    type: argon2.argon2id,
-    memoryCost: 2 ** 16, // 64 MB
-    timeCost: 3,
-    parallelism: 1,
-  };
+  private static readonly SALT_ROUNDS = 12;
 
   static async hash(password: string): Promise<string> {
     try {
-      return await argon2.hash(password, this.ARGON2_OPTIONS);
+      return await bcrypt.hash(password, this.SALT_ROUNDS);
     } catch (error) {
       console.error('Password hashing failed:', error);
       throw new Error('Failed to hash password');
@@ -19,7 +14,7 @@ export class PasswordService {
 
   static async verify(hash: string, password: string): Promise<boolean> {
     try {
-      return await argon2.verify(hash, password);
+      return await bcrypt.compare(password, hash);
     } catch (error) {
       console.error('Password verification failed:', error);
       return false;

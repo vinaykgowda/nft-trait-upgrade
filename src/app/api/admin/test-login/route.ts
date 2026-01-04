@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Pool } from 'pg';
-import * as argon2 from 'argon2';
+import * as bcrypt from 'bcryptjs';
 
 export async function POST(request: NextRequest) {
   try {
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
 
     // Verify password
     console.log('Verifying password...');
-    const passwordValid = await argon2.verify(user.password_hash, password);
+    const passwordValid = await bcrypt.compare(password, user.password_hash);
     console.log('Password valid:', passwordValid);
 
     await pool.end();

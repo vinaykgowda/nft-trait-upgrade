@@ -183,7 +183,7 @@ export class ImageCompositionService {
 
   /**
    * Creates a high-quality final composition for NFT metadata
-   * Fixed at 1500x1500px for consistent NFT standards
+   * Fixed at 1500x1500px JPEG 90% quality for optimal file size
    */
   async createFinalComposition(
     baseImageUrl: string,
@@ -194,17 +194,18 @@ export class ImageCompositionService {
     return this.composeImage(baseImageUrl, selectedTraits, slots, {
       width: 1500,
       height: 1500,
-      format: 'png'
+      format: 'jpeg',
+      quality: 90
     }, baseUrl);
   }
 
   /**
-   * Gets the standard NFT image dimensions
+   * Gets the standard NFT image dimensions and formats
    */
   static getStandardDimensions() {
     return {
-      preview: { width: 512, height: 512 },
-      final: { width: 1500, height: 1500 }
+      preview: { width: 512, height: 512, format: 'png' },
+      final: { width: 1500, height: 1500, format: 'jpeg', quality: 90 }
     };
   }
 

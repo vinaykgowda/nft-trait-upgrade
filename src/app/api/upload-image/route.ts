@@ -32,12 +32,12 @@ export async function POST(request: NextRequest) {
       }
 
       const timestamp = Date.now();
-      const sanitizedFilename = (filename || 'image.png').replace(/[^a-zA-Z0-9.-]/g, '_');
+      const sanitizedFilename = (filename || 'image.jpg').replace(/[^a-zA-Z0-9.-]/g, '_');
       const blobFilename = permanent ? `nft/${timestamp}_${sanitizedFilename}` : `temp/${timestamp}_${sanitizedFilename}`;
 
       const blob = await put(blobFilename, buffer, {
         access: 'public',
-        contentType: contentType || 'image/png',
+        contentType: contentType || 'image/jpeg',
       });
 
       console.log(`✅ Image uploaded to Vercel Blob: ${blob.url}`);
@@ -64,12 +64,12 @@ export async function POST(request: NextRequest) {
       }
 
       const timestamp = Date.now();
-      const sanitizedFilename = (filename || 'image.png').replace(/[^a-zA-Z0-9.-]/g, '_');
+      const sanitizedFilename = (filename || 'image.jpg').replace(/[^a-zA-Z0-9.-]/g, '_');
       const blobFilename = `nft/${timestamp}_${sanitizedFilename}`;
 
       const blob = await put(blobFilename, buffer, {
         access: 'public',
-        contentType: contentType || 'image/png',
+        contentType: contentType || 'image/jpeg',
       });
 
       console.log(`✅ Fallback: Image uploaded to Vercel Blob: ${blob.url}`);
@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
     try {
       // Upload to Irys for permanent blockchain storage
       const irysService = new IrysUploadService(keypair);
-      const uploadResult = await irysService.uploadImage(buffer, contentType || 'image/png');
+      const uploadResult = await irysService.uploadImage(buffer, contentType || 'image/jpeg');
 
       console.log(`✅ Image uploaded to Irys (permanent): ${uploadResult.url}`);
 
@@ -117,12 +117,12 @@ export async function POST(request: NextRequest) {
       }
 
       const timestamp = Date.now();
-      const sanitizedFilename = (filename || 'image.png').replace(/[^a-zA-Z0-9.-]/g, '_');
+      const sanitizedFilename = (filename || 'image.jpg').replace(/[^a-zA-Z0-9.-]/g, '_');
       const blobFilename = `nft/${timestamp}_${sanitizedFilename}`;
 
       const blob = await put(blobFilename, buffer, {
         access: 'public',
-        contentType: contentType || 'image/png',
+        contentType: contentType || 'image/jpeg',
       });
 
       console.log(`⚠️ Fallback: Image uploaded to Vercel Blob: ${blob.url}`);

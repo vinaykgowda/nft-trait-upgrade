@@ -45,7 +45,7 @@ export class IrysUploadService {
    */
   async uploadImage(
     imageBuffer: Buffer,
-    contentType: string = 'image/png'
+    contentType: string = 'image/jpeg'
   ): Promise<IrysUploadResult> {
     try {
       console.log(`📤 Uploading image to Irys (${this.irysUrl})`);
@@ -110,7 +110,7 @@ export class IrysUploadService {
   async uploadImageAndMetadata(
     imageBuffer: Buffer,
     metadata: Omit<NFTMetadata, 'image'>,
-    imageContentType: string = 'image/png'
+    imageContentType: string = 'image/jpeg'
   ): Promise<{ imageResult: IrysUploadResult; metadataResult: IrysUploadResult }> {
     try {
       // Upload image first

@@ -155,7 +155,7 @@ export class PurchaseRepository extends BaseRepository<PurchaseRow> {
       wallet_address: purchase.walletAddress,
       asset_id: purchase.assetId,
       trait_id: purchase.traitId,
-      price_amount: purchase.priceAmount?.toString(),
+      price_amount: purchase.priceAmount ? Math.floor(Number(purchase.priceAmount)).toString() : undefined,
       token_id: purchase.tokenId,
       status: purchase.status,
       tx_signature: purchase.txSignature,

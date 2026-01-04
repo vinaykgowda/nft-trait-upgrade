@@ -60,19 +60,31 @@ export async function POST(request: NextRequest) {
       hasUpdate: validation.hasUpdateInstruction
     });
 
-    // Create purchase record for the trait in the reservation
-    const mockPurchaseData = {
+    // Get trait data to determine actual price and token
+    const traitRepo = new (await import('@/lib/repositories/traits')).TraitRepository();
+    const traitsWithRelations = await traitRepo.findWithRelations({});
+    const trait = traitsWithRelations.find(t => t.id === reservation.traitId);
+    
+    if (!trait) {
+      return NextResponse.json(
+        { success: false, error: 'Trait not found' },
+        { status: 400 }
+      );
+    }
+
+    // Create purchase record with actual trait data
+    const purchaseData = {
       walletAddress: reservation.walletAddress,
       assetId: reservation.assetId,
       traitId: reservation.traitId,
-      priceAmount: '1.0', // This should come from trait data
-      tokenId: 'sol-token-id', // This should come from trait data
+      priceAmount: trait.price_amount, // Use actual trait price (already in base units)
+      tokenId: trait.price_token_id, // Use actual token ID
       treasuryWallet: process.env.TREASURY_WALLET || 'EE72RERKxoJFt61MFZSnWvztjD43zPDr2aVizkS41nLC',
       status: 'tx_built' as const,
     };
 
     // Consume the reservation and create purchase records
-    const consumeResult = await inventoryManager.consumeReservation(reservationId, mockPurchaseData);
+    const consumeResult = await inventoryManager.consumeReservation(reservationId, purchaseData);
     if (!consumeResult.success) {
       return NextResponse.json(
         { success: false, error: consumeResult.error || 'Failed to consume reservation' },

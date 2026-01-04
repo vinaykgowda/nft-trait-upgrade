@@ -7,12 +7,19 @@ export async function POST(request: NextRequest) {
   try {
     const { baseImageUrl, selectedTraits, assetId } = await request.json();
 
-    if (!baseImageUrl || !selectedTraits || !Array.isArray(selectedTraits)) {
+    if (!baseImageUrl || !selectedTraits) {
       return NextResponse.json(
         { error: 'Missing required fields: baseImageUrl, selectedTraits' },
         { status: 400 }
       );
     }
+
+    console.log('🎨 Compose-image API received:', {
+      baseImageUrl,
+      selectedTraits: typeof selectedTraits === 'object' ? Object.keys(selectedTraits) : selectedTraits,
+      assetId,
+      traitCount: typeof selectedTraits === 'object' ? Object.keys(selectedTraits).length : 0
+    });
 
     // Get the base URL from the request headers
     const protocol = request.headers.get('x-forwarded-proto') || 'http';
@@ -24,10 +31,25 @@ export async function POST(request: NextRequest) {
     const slots = await traitSlotRepo.findAllOrdered();
     const domainSlots = slots.map(slot => traitSlotRepo.toDomain(slot));
 
-    // Convert traits array to TraitSelection format
-    const traitSelection: Record<string, Trait> = {};
-    selectedTraits.forEach((trait: Trait) => {
-      traitSelection[trait.slotId] = trait;
+    // Handle both TraitSelection object and array formats
+    let traitSelection: Record<string, Trait>;
+    
+    if (Array.isArray(selectedTraits)) {
+      // Convert traits array to TraitSelection format (legacy support)
+      traitSelection = {};
+      selectedTraits.forEach((trait: Trait) => {
+        traitSelection[trait.slotId] = trait;
+      });
+      console.log('🔄 Converted array to TraitSelection object');
+    } else {
+      // Already in TraitSelection format
+      traitSelection = selectedTraits;
+      console.log('✅ Using TraitSelection object directly');
+    }
+
+    console.log('🎨 Final trait selection for composition:', {
+      slotIds: Object.keys(traitSelection),
+      traits: Object.values(traitSelection).map(t => ({ name: t.name, slotId: t.slotId }))
     });
 
     // Compose the image at fixed 1500x1500 dimensions

@@ -41,6 +41,15 @@ export class ImageCompositionService {
     } = options;
 
     try {
+      console.log('🎨 Starting image composition:', {
+        baseImageUrl,
+        selectedTraitsCount: Object.keys(selectedTraits).length,
+        selectedTraitsKeys: Object.keys(selectedTraits),
+        slotsCount: slots.length,
+        dimensions: `${width}x${height}`,
+        format
+      });
+
       // Handle transparent base case
       let compositeImage: sharp.Sharp;
       
@@ -191,6 +200,13 @@ export class ImageCompositionService {
     slots: TraitSlot[],
     baseUrl?: string
   ): Promise<CompositionResult> {
+    console.log('🎨 Creating final composition:', {
+      baseImageUrl,
+      selectedTraits: Object.keys(selectedTraits),
+      traitCount: Object.keys(selectedTraits).length,
+      slots: slots.length
+    });
+
     return this.composeImage(baseImageUrl, selectedTraits, slots, {
       width: 1500,
       height: 1500,

@@ -148,12 +148,20 @@ export function PurchaseFlow({ selectedNFT, selectedTraits, onSuccess, onCancel 
 
       // Step 5: Compose new image with traits
       updateState({ step: 'composing', progress: 92 });
+      
+      console.log('🎨 Composing image with traits:', {
+        baseImageUrl: selectedNFT.image,
+        selectedTraits: selectedTraits, // Send the full TraitSelection object
+        assetId: selectedNFT.address,
+        traitCount: Object.keys(selectedTraits).length
+      });
+      
       const composeResponse = await fetch('/api/compose-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           baseImageUrl: selectedNFT.image,
-          selectedTraits: Object.values(selectedTraits),
+          selectedTraits: selectedTraits, // Send the TraitSelection object, not Object.values()
           assetId: selectedNFT.address
         })
       });

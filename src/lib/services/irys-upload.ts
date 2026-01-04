@@ -1,4 +1,5 @@
 import { Keypair } from '@solana/web3.js';
+import Irys from '@irys/sdk';
 
 export interface IrysUploadResult {
   id: string;
@@ -33,6 +34,7 @@ export interface NFTMetadata {
 export class IrysUploadService {
   private irysUrl: string;
   private keypair: Keypair;
+  private irysClient: Irys | null = null;
 
   constructor(keypair: Keypair, irysUrl?: string) {
     this.keypair = keypair;
@@ -40,47 +42,115 @@ export class IrysUploadService {
     this.irysUrl = irysUrl || process.env.IRYS_NODE_URL || 'https://devnet.irys.xyz';
   }
 
+  private async getIrysClient(): Promise<Irys> {
+    if (!this.irysClient) {
+      try {
+        this.irysClient = new Irys({
+          url: this.irysUrl,
+          token: 'solana',
+          key: this.keypair.secretKey,
+        });
+        console.log(`🔗 Connected to Irys: ${this.irysUrl}`);
+      } catch (error) {
+        console.error('❌ Failed to initialize Irys client:', error);
+        throw new Error(`Irys initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    }
+    return this.irysClient;
+  }
+
   /**
-   * Uploads image buffer to Irys (simplified version)
+   * Uploads image buffer to Irys
    */
   async uploadImage(
     imageBuffer: Buffer,
     contentType: string = 'image/jpeg'
   ): Promise<IrysUploadResult> {
     try {
-      console.log(`📤 Attempting Irys upload (${this.irysUrl})`);
+      console.log(`📤 Uploading image to Irys (${this.irysUrl})`);
       console.log(`   - Size: ${imageBuffer.length} bytes`);
       console.log(`   - Content-Type: ${contentType}`);
       console.log(`   - Public Key: ${this.keypair.publicKey.toString()}`);
 
-      // For now, we'll use a simplified approach and throw an error
-      // This will trigger the fallback to Vercel Blob in the upload-image route
-      throw new Error('Irys upload temporarily disabled - using Vercel Blob fallback');
+      const irys = await this.getIrysClient();
 
+      // Check balance before upload
+      const balance = await irys.getLoadedBalance();
+      console.log(`💰 Current Irys balance: ${balance} atomic units`);
+
+      // Estimate cost
+      const price = await irys.getPrice(imageBuffer.length);
+      console.log(`💸 Upload cost estimate: ${price} atomic units`);
+
+      if (balance.lt(price)) {
+        console.warn('⚠️ Insufficient balance for upload, attempting anyway...');
+      }
+
+      // Upload the image
+      const response = await irys.upload(imageBuffer, {
+        tags: [
+          { name: 'Content-Type', value: contentType },
+          { name: 'Application', value: 'NFT-Trait-Marketplace' },
+          { name: 'Type', value: 'image' },
+          { name: 'Timestamp', value: Date.now().toString() }
+        ]
+      });
+
+      const uploadUrl = `${this.irysUrl}/${response.id}`;
+
+      console.log(`✅ Image uploaded to Irys successfully`);
+      console.log(`   - ID: ${response.id}`);
+      console.log(`   - URL: ${uploadUrl}`);
+      
+      return {
+        id: response.id,
+        url: uploadUrl,
+        size: imageBuffer.length
+      };
     } catch (error) {
-      console.error('❌ Irys upload failed:', error);
-      throw new Error(`Irys upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('❌ Error uploading image to Irys:', error);
+      throw new Error(`Image upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
   /**
-   * Uploads JSON metadata to Irys (simplified version)
+   * Uploads JSON metadata to Irys
    */
   async uploadMetadata(metadata: NFTMetadata): Promise<IrysUploadResult> {
     try {
       const metadataJson = JSON.stringify(metadata, null, 2);
       const metadataBuffer = Buffer.from(metadataJson, 'utf-8');
 
-      console.log(`📤 Attempting Irys metadata upload`);
+      console.log(`📤 Uploading metadata to Irys`);
       console.log(`   - Size: ${metadataBuffer.length} bytes`);
+      console.log(`   - Metadata:`, metadata);
 
-      // For now, we'll use a simplified approach and throw an error
-      // This will trigger the fallback to Vercel Blob in the upload-image route
-      throw new Error('Irys metadata upload temporarily disabled - using Vercel Blob fallback');
+      const irys = await this.getIrysClient();
 
+      // Upload the metadata
+      const response = await irys.upload(metadataBuffer, {
+        tags: [
+          { name: 'Content-Type', value: 'application/json' },
+          { name: 'Application', value: 'NFT-Trait-Marketplace' },
+          { name: 'Type', value: 'metadata' },
+          { name: 'Timestamp', value: Date.now().toString() }
+        ]
+      });
+
+      const uploadUrl = `${this.irysUrl}/${response.id}`;
+
+      console.log(`✅ Metadata uploaded to Irys successfully`);
+      console.log(`   - ID: ${response.id}`);
+      console.log(`   - URL: ${uploadUrl}`);
+      
+      return {
+        id: response.id,
+        url: uploadUrl,
+        size: metadataBuffer.length
+      };
     } catch (error) {
-      console.error('❌ Irys metadata upload failed:', error);
-      throw new Error(`Irys metadata upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('❌ Error uploading metadata to Irys:', error);
+      throw new Error(`Metadata upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -146,8 +216,9 @@ export class IrysUploadService {
   async getBalance(): Promise<string> {
     try {
       console.log(`💰 Getting balance for: ${this.keypair.publicKey.toString()}`);
-      // Return mock balance for now
-      return '1000000000'; // 1 SOL in lamports
+      const irys = await this.getIrysClient();
+      const balance = await irys.getLoadedBalance();
+      return balance.toString();
     } catch (error) {
       console.error('❌ Error getting Irys balance:', error);
       throw error;
@@ -160,11 +231,15 @@ export class IrysUploadService {
   async fundAccount(amount: number): Promise<{ success: boolean; txId?: string; error?: string }> {
     try {
       console.log(`💸 Funding Irys account with ${amount} SOL`);
+      const irys = await this.getIrysClient();
       
-      // For now, return mock success
-      const mockTxId = 'mock_fund_' + Date.now();
-      console.log(`✅ Mock funding successful: ${mockTxId}`);
-      return { success: true, txId: mockTxId };
+      // Convert SOL to lamports (1 SOL = 1,000,000,000 lamports)
+      const lamports = Math.floor(amount * 1_000_000_000);
+      
+      const response = await irys.fund(lamports);
+      
+      console.log(`✅ Account funded successfully: ${response.id}`);
+      return { success: true, txId: response.id };
     } catch (error) {
       console.error('❌ Error funding account:', error);
       return { 

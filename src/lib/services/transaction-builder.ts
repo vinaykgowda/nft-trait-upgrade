@@ -227,17 +227,19 @@ export class TransactionBuilder {
         attributes: newAttributes.length
       });
 
-      // TEMPORARILY DISABLED: Core update functionality
-      // The UMI RPC interface needs proper configuration
-      console.warn('⚠️ Core update temporarily disabled - using placeholder instruction');
+      // TODO: Implement proper Metaplex Core update
+      // For now, create a memo instruction with the new image URL
+      console.log('📝 Creating memo instruction with new image URL');
       
-      // Create a placeholder instruction that won't fail the transaction
+      const memoData = Buffer.from(`NFT_UPDATE:${newImageUrl}`, 'utf8');
+      
       return new TransactionInstruction({
         keys: [
           { pubkey: assetId, isSigner: false, isWritable: false },
+          { pubkey: this.delegateKeypair!.publicKey, isSigner: true, isWritable: false },
         ],
-        programId: new PublicKey('11111111111111111111111111111112'), // System program
-        data: Buffer.from('placeholder'), // Minimal data
+        programId: new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr'), // Memo program
+        data: memoData,
       });
 
     } catch (error) {

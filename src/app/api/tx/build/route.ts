@@ -185,9 +185,22 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ Payment transaction built and validated successfully');
 
+    // Serialize the transaction with proper error handling
+    let serializedTransaction: string;
+    try {
+      serializedTransaction = partiallySignedTransaction.transaction.serialize({ 
+        requireAllSignatures: false,
+        verifySignatures: false 
+      }).toString('base64');
+      console.log('✅ Transaction serialized successfully');
+    } catch (serializationError) {
+      console.error('❌ Transaction serialization failed:', serializationError);
+      return apiResponse.error(`Transaction serialization failed: ${serializationError instanceof Error ? serializationError.message : 'Unknown error'}`, 500);
+    }
+
     // Return the payment-only transaction for user to sign
     return apiResponse.success({
-      transaction: partiallySignedTransaction.transaction.serialize({ requireAllSignatures: false }).toString('base64'),
+      transaction: serializedTransaction,
       reservationId,
       transactionType: 'payment',
       paymentDetails: {

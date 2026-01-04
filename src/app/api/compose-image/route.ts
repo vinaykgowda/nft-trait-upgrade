@@ -30,13 +30,12 @@ export async function POST(request: NextRequest) {
       traitSelection[trait.slotId] = trait;
     });
 
-    // Compose the image
+    // Compose the image at fixed 1500x1500 dimensions
     const compositionService = new ImageCompositionService();
     const result = await compositionService.createFinalComposition(
       baseImageUrl,
       traitSelection,
       domainSlots,
-      1500, // High quality 1500x1500 for final NFT
       baseUrl // Pass the base URL for relative path resolution
     );
 

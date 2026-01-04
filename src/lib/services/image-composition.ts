@@ -165,13 +165,13 @@ export class ImageCompositionService {
   }
 
   /**
-   * Creates a preview composition for client-side display
+   * Creates a preview composition for client-side display (smaller for performance)
    */
   async createPreview(
     baseImageUrl: string,
     selectedTraits: TraitSelection,
     slots: TraitSlot[],
-    previewSize: number = 1500,
+    previewSize: number = 512,
     baseUrl?: string
   ): Promise<CompositionResult> {
     return this.composeImage(baseImageUrl, selectedTraits, slots, {
@@ -183,19 +183,29 @@ export class ImageCompositionService {
 
   /**
    * Creates a high-quality final composition for NFT metadata
+   * Fixed at 1500x1500px for consistent NFT standards
    */
   async createFinalComposition(
     baseImageUrl: string,
     selectedTraits: TraitSelection,
     slots: TraitSlot[],
-    finalSize: number = 1500,
     baseUrl?: string
   ): Promise<CompositionResult> {
     return this.composeImage(baseImageUrl, selectedTraits, slots, {
-      width: finalSize,
-      height: finalSize,
+      width: 1500,
+      height: 1500,
       format: 'png'
     }, baseUrl);
+  }
+
+  /**
+   * Gets the standard NFT image dimensions
+   */
+  static getStandardDimensions() {
+    return {
+      preview: { width: 512, height: 512 },
+      final: { width: 1500, height: 1500 }
+    };
   }
 
 }

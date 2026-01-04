@@ -95,13 +95,14 @@ export class TraitRepository extends BaseRepository<TraitRow> {
         ts.layer_order as slot_layer_order,
         rt.name as rarity_name,
         rt.weight as rarity_weight,
-        tok.symbol as token_symbol,
-        tok.decimals as token_decimals,
-        tok.mint_address as token_mint_address
+        COALESCE(tok.symbol, pt.token_symbol) as token_symbol,
+        COALESCE(tok.decimals, pt.decimals) as token_decimals,
+        COALESCE(tok.mint_address, pt.token_address) as token_mint_address
       FROM ${this.tableName} t
       LEFT JOIN trait_slots ts ON t.slot_id = ts.id
       LEFT JOIN rarity_tiers rt ON t.rarity_tier_id = rt.id
       LEFT JOIN tokens tok ON t.price_token_id = tok.id
+      LEFT JOIN project_tokens pt ON t.price_token_id = pt.id
       ${whereClause}
       ORDER BY COALESCE(ts.layer_order, 999), COALESCE(rt.display_order, 999), t.name
       ${limitClause}

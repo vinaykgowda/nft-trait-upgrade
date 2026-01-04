@@ -135,7 +135,7 @@ export async function PUT(
       });
     }
 
-    // Convert project token ID to main token ID if needed
+    // Handle token ID - support both main tokens and project tokens
     let finalTokenId = priceTokenId;
     
     // Check if this is a project token ID by looking it up
@@ -147,33 +147,22 @@ export async function PUT(
     if (mainTokenCheck.rows.length === 0) {
       // Not a main token ID, check if it's a project token ID
       const projectTokenCheck = await query(`
-        SELECT token_address, token_symbol 
+        SELECT id, token_address, token_symbol 
         FROM project_tokens 
         WHERE id = $1
       `, [priceTokenId]);
       
       if (projectTokenCheck.rows.length > 0) {
-        const projectToken = projectTokenCheck.rows[0];
-        
-        // Find corresponding main token by address/symbol
-        const mainTokenLookup = await query(`
-          SELECT id FROM tokens 
-          WHERE mint_address = $1 OR symbol = $2
-        `, [projectToken.token_address, projectToken.token_symbol]);
-        
-        if (mainTokenLookup.rows.length > 0) {
-          finalTokenId = mainTokenLookup.rows[0].id;
-          console.log(`🔄 Converted project token ${priceTokenId} to main token ${finalTokenId}`);
-        } else {
-          return NextResponse.json({ 
-            error: `Token not found in main tokens table. Please contact admin to add ${projectToken.token_symbol} token.` 
-          }, { status: 400 });
-        }
+        // It's a valid project token, use it directly
+        finalTokenId = priceTokenId;
+        console.log(`✅ Using project token ID: ${priceTokenId} (${projectTokenCheck.rows[0].token_symbol})`);
       } else {
         return NextResponse.json({ 
           error: 'Invalid token ID provided' 
         }, { status: 400 });
       }
+    } else {
+      console.log(`✅ Using main token ID: ${priceTokenId}`);
     }
     // Map category to slot ID - using actual database slot IDs
     const categoryToSlotId: Record<string, string> = {

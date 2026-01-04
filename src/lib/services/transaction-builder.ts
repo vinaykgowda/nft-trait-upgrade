@@ -19,6 +19,7 @@ import {
   some,
   none,
 } from '@metaplex-foundation/umi';
+import { createUmiFromConnection } from '@metaplex-foundation/umi-web3js-adapters';
 import { fromWeb3JsKeypair } from '@metaplex-foundation/umi-web3js-adapters';
 import {
   updateV1,
@@ -61,8 +62,8 @@ export class TransactionBuilder {
   constructor() {
     this.connection = new Connection(RPC_CONFIG.HELIUS_RPC_URL, 'confirmed');
     
-    // Initialize UMI for Metaplex Core with proper RPC connection
-    this.umi = createUmi(RPC_CONFIG.HELIUS_RPC_URL);
+    // Initialize UMI for Metaplex Core with web3js connection
+    this.umi = createUmiFromConnection(this.connection);
     
     // Initialize delegate keypair if private key is provided
     const delegatePrivateKey = process.env.SOLANA_DELEGATE_PRIVATE_KEY;

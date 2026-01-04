@@ -55,6 +55,7 @@ export interface Purchase {
   traitId: string;
   priceAmount: string; // Changed from bigint to string
   tokenId: string;
+  treasuryWallet: string; // Added missing field
   status: PurchaseStatus;
   txSignature?: string;
 }

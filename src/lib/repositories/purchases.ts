@@ -144,6 +144,7 @@ export class PurchaseRepository extends BaseRepository<PurchaseRow> {
       traitId: row.trait_id,
       priceAmount: row.price_amount, // Keep as string
       tokenId: row.token_id,
+      treasuryWallet: row.treasury_wallet,
       status: row.status,
       txSignature: row.tx_signature,
     };
@@ -157,6 +158,7 @@ export class PurchaseRepository extends BaseRepository<PurchaseRow> {
       trait_id: purchase.traitId,
       price_amount: purchase.priceAmount ? Math.floor(Number(purchase.priceAmount)).toString() : undefined,
       token_id: purchase.tokenId,
+      treasury_wallet: purchase.treasuryWallet,
       status: purchase.status,
       tx_signature: purchase.txSignature,
     };

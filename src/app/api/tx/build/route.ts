@@ -5,6 +5,7 @@ import { TraitRepository } from '@/lib/repositories/traits';
 import { ProjectRepository } from '@/lib/repositories/projects';
 import { ProjectTokensService } from '@/lib/services/project-tokens';
 import { createNFTService } from '@/lib/services/nft';
+import { configService } from '@/lib/services/config';
 import { createApiResponse, getRequestId } from '@/lib/api/response';
 import { validateRequestBody } from '@/lib/api/validation';
 import { z } from 'zod';
@@ -104,16 +105,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Get project configuration (including treasury wallet) from database
-    let treasuryWallet: string;
-    
-    // For development, use fallback treasury wallet
-    treasuryWallet = process.env.TREASURY_WALLET!;
+    // Get project configuration (including treasury wallet) from dynamic config
+    const treasuryWallet = await configService.getTreasuryWallet();
     console.log('💰 Using treasury wallet:', treasuryWallet);
-
-    if (!treasuryWallet) {
-      return apiResponse.error('Treasury wallet not configured', 500);
-    }
 
     // Determine primary payment token and amount
     let primaryToken: 'SOL' | 'LDZ';
@@ -126,7 +120,7 @@ export async function POST(request: NextRequest) {
       primaryAmount = totalAmount;
       
       if (paymentToken === 'LDZ') {
-        tokenMintAddress = process.env.LDZ_TOKEN_MINT;
+        tokenMintAddress = await configService.getTokenMintAddress('LDZ');
         if (!tokenMintAddress) {
           return apiResponse.error('LDZ token mint not configured', 500);
         }
@@ -138,7 +132,7 @@ export async function POST(request: NextRequest) {
       } else if (ldzTotal > 0) {
         primaryToken = 'LDZ';
         primaryAmount = ldzTotal;
-        tokenMintAddress = process.env.LDZ_TOKEN_MINT;
+        tokenMintAddress = await configService.getTokenMintAddress('LDZ');
         if (!tokenMintAddress) {
           return apiResponse.error('LDZ token mint not configured', 500);
         }

@@ -4,6 +4,7 @@ import { TransactionBuilder } from '@/lib/services/transaction-builder';
 import { InventoryManager } from '@/lib/services/inventory-manager';
 import { PurchaseRepository } from '@/lib/repositories/purchases';
 import { TransactionMonitor } from '@/lib/services/transaction-monitor';
+import { configService } from '@/lib/services/config';
 import { Transaction } from '@solana/web3.js';
 
 const confirmTransactionSchema = z.object({
@@ -72,6 +73,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Get dynamic treasury wallet from config
+    const treasuryWallet = await configService.getTreasuryWallet();
+
     // Create purchase record with actual trait data
     const purchaseData = {
       walletAddress: reservation.walletAddress,
@@ -79,7 +83,7 @@ export async function POST(request: NextRequest) {
       traitId: reservation.traitId,
       priceAmount: trait.price_amount, // Use actual trait price (already in base units)
       tokenId: trait.price_token_id, // Use actual token ID
-      treasuryWallet: process.env.TREASURY_WALLET || 'EE72RERKxoJFt61MFZSnWvztjD43zPDr2aVizkS41nLC',
+      treasuryWallet: treasuryWallet, // Use dynamic treasury wallet
       status: 'tx_built' as const,
     };
 

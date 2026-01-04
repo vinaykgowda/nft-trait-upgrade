@@ -232,20 +232,25 @@ export default function TraitsManagerPage() {
       console.log('🔍 Raw tokens from service:', tokens);
       
       // Always include SOL as default
-      const solToken = ProjectTokensService.getDefaultSOLToken();
-      const uniqueTokens = [solToken, ...tokens.filter(t => t.tokenAddress !== solToken.tokenAddress)];
-      
-      console.log('🔍 Final available tokens:', uniqueTokens.map(t => ({ 
-        id: t.id, 
-        symbol: t.tokenSymbol, 
-        address: t.tokenAddress 
-      })));
-      
-      setAvailableTokens(uniqueTokens);
+      const solToken = await ProjectTokensService.getDefaultSOLToken();
+      if (solToken) {
+        const uniqueTokens = [solToken, ...tokens.filter(t => t.tokenAddress !== solToken.tokenAddress)];
+        
+        console.log('🔍 Final available tokens:', uniqueTokens.map(t => ({ 
+          id: t.id, 
+          symbol: t.tokenSymbol, 
+          address: t.tokenAddress 
+        })));
+        
+        setAvailableTokens(uniqueTokens);
+      } else {
+        setAvailableTokens(tokens);
+      }
     } catch (error) {
       console.error('Failed to fetch available tokens:', error);
       // Fallback to SOL only
-      setAvailableTokens([ProjectTokensService.getDefaultSOLToken()]);
+      const fallbackSol = await ProjectTokensService.getDefaultSOLToken();
+      setAvailableTokens(fallbackSol ? [fallbackSol] : []);
     }
   };
 

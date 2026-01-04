@@ -228,29 +228,30 @@ export default function TraitsManagerPage() {
   const fetchAvailableTokens = async () => {
     try {
       console.log('🔍 Fetching available tokens...');
-      const tokens = await ProjectTokensService.getAllAvailableTokens();
-      console.log('🔍 Raw tokens from service:', tokens);
       
-      // Always include SOL as default
-      const solToken = await ProjectTokensService.getDefaultSOLToken();
-      if (solToken) {
-        const uniqueTokens = [solToken, ...tokens.filter(t => t.tokenAddress !== solToken.tokenAddress)];
-        
-        console.log('🔍 Final available tokens:', uniqueTokens.map(t => ({ 
-          id: t.id, 
-          symbol: t.tokenSymbol, 
-          address: t.tokenAddress 
-        })));
-        
-        setAvailableTokens(uniqueTokens);
-      } else {
-        setAvailableTokens(tokens);
+      // Fetch tokens from API endpoint instead of direct database call
+      const response = await fetch('/api/admin/tokens/available', {
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch tokens: ${response.statusText}`);
       }
+      
+      const data = await response.json();
+      const tokens = data.tokens || [];
+      
+      console.log('🔍 Final available tokens:', tokens.map((t: any) => ({ 
+        id: t.id, 
+        symbol: t.tokenSymbol, 
+        address: t.tokenAddress 
+      })));
+      
+      setAvailableTokens(tokens);
     } catch (error) {
       console.error('Failed to fetch available tokens:', error);
-      // Fallback to SOL only
-      const fallbackSol = await ProjectTokensService.getDefaultSOLToken();
-      setAvailableTokens(fallbackSol ? [fallbackSol] : []);
+      // Fallback to empty array
+      setAvailableTokens([]);
     }
   };
 

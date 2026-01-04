@@ -1,6 +1,5 @@
 // Service for managing project tokens
 import { ProjectToken } from '@/types';
-import { query } from '@/lib/database';
 
 export interface ProjectTokensResponse {
   success: boolean;
@@ -84,17 +83,13 @@ export class ProjectTokensService {
       // If no SOL token found, add a fallback (this shouldn't happen in production)
       const hasSol = tokens.some(t => t.tokenAddress === 'So11111111111111111111111111111111111111112');
       if (!hasSol) {
-        const solToken = await this.getDefaultSOLToken();
-        if (solToken) {
-          tokens.unshift(solToken);
-        }
+        tokens.unshift(this.getDefaultSOLTokenSync());
       }
 
       return tokens;
     } catch (error) {
       console.error('Failed to fetch all available tokens:', error);
-      const fallbackSol = await this.getDefaultSOLToken();
-      return fallbackSol ? [fallbackSol] : []; // Fallback to SOL only if available
+      return [this.getDefaultSOLTokenSync()]; // Fallback to SOL only
     }
   }
 
@@ -145,61 +140,11 @@ export class ProjectTokensService {
   }
 
   /**
-   * Get default SOL token info (dynamically fetched from database)
-   */
-  static async getDefaultSOLToken(): Promise<ProjectToken | null> {
-    try {
-      // First try to get from main tokens table
-      const mainTokenResult = await query('SELECT id FROM tokens WHERE symbol = $1', ['SOL']);
-      
-      if (mainTokenResult.rows.length > 0) {
-        return {
-          id: mainTokenResult.rows[0].id,
-          projectId: '',
-          tokenAddress: 'So11111111111111111111111111111111111111112',
-          tokenName: 'Solana',
-          tokenSymbol: 'SOL',
-          decimals: 9,
-          enabled: true,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        };
-      }
-      
-      // If not found in main tokens, try project tokens
-      const projectTokenResult = await query(
-        'SELECT id FROM project_tokens WHERE token_symbol = $1 LIMIT 1', 
-        ['SOL']
-      );
-      
-      if (projectTokenResult.rows.length > 0) {
-        return {
-          id: projectTokenResult.rows[0].id,
-          projectId: '',
-          tokenAddress: 'So11111111111111111111111111111111111111112',
-          tokenName: 'Solana',
-          tokenSymbol: 'SOL',
-          decimals: 9,
-          enabled: true,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        };
-      }
-      
-      return null;
-    } catch (error) {
-      console.error('Error fetching default SOL token:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Get default SOL token info (synchronous fallback - deprecated)
-   * @deprecated Use getDefaultSOLToken() instead
+   * Get default SOL token info (synchronous fallback)
    */
   static getDefaultSOLTokenSync(): ProjectToken {
     return {
-      id: 'sol-placeholder', // Will be replaced by dynamic lookup
+      id: 'sol-placeholder', // Will be replaced by API lookup
       projectId: '',
       tokenAddress: 'So11111111111111111111111111111111111111112',
       tokenName: 'Solana',

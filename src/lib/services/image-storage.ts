@@ -1,18 +1,33 @@
 import { IrysUploadService } from './irys-upload';
 import { Keypair } from '@solana/web3.js';
+import { put } from '@vercel/blob';
 
 export interface ImageStorageOptions {
   category: string;
   rarity: string;
   filename: string;
+  permanent?: boolean; // true = Irys (permanent, costs more), false = Vercel Blob (temporary, cheaper)
 }
 
 export class ImageStorageService {
   /**
-   * Store an image file using Irys (cloud storage)
+   * Store an image file using either Irys (permanent) or Vercel Blob (temporary)
    * Returns the public URL of the uploaded image
    */
   static async storeImage(file: File, options: ImageStorageOptions): Promise<string> {
+    const { permanent = false } = options; // Default to cheaper Vercel Blob
+    
+    if (permanent) {
+      return this.storeImageIrys(file, options);
+    } else {
+      return this.storeImageVercelBlob(file, options);
+    }
+  }
+  
+  /**
+   * Store image permanently on Irys (~$0.001-0.005 per image)
+   */
+  private static async storeImageIrys(file: File, options: ImageStorageOptions): Promise<string> {
     try {
       // Load keypair for Irys
       const keypairData = JSON.parse(process.env.SOLANA_KEYPAIR || '[]');
@@ -31,23 +46,63 @@ export class ImageStorageService {
       // Upload to Irys
       const result = await irysService.uploadImage(buffer, file.type);
       
-      console.log(`✅ Image uploaded to Irys: ${result.url}`);
+      console.log(`✅ Image uploaded to Irys (permanent): ${result.url}`);
       return result.url;
       
     } catch (error) {
       console.error('Failed to upload image to Irys:', error);
-      throw new Error('Failed to upload image to cloud storage');
+      throw new Error('Failed to upload image to permanent storage');
     }
   }
   
   /**
-   * Delete an image file (Irys doesn't support deletion, so this is a no-op)
+   * Store image temporarily on Vercel Blob (~$0.15/GB/month, much cheaper)
+   */
+  private static async storeImageVercelBlob(file: File, options: ImageStorageOptions): Promise<string> {
+    try {
+      if (!process.env.BLOB_READ_WRITE_TOKEN) {
+        throw new Error('BLOB_READ_WRITE_TOKEN environment variable not set');
+      }
+      
+      const { category, rarity, filename } = options;
+      
+      // Create a structured filename
+      const timestamp = Date.now();
+      const sanitizedFilename = filename.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const blobFilename = `traits/${category}/${rarity}/${timestamp}_${sanitizedFilename}`;
+      
+      // Upload to Vercel Blob
+      const blob = await put(blobFilename, file, {
+        access: 'public',
+        contentType: file.type,
+      });
+      
+      console.log(`✅ Image uploaded to Vercel Blob (temporary): ${blob.url}`);
+      return blob.url;
+      
+    } catch (error) {
+      console.error('Failed to upload image to Vercel Blob:', error);
+      throw new Error('Failed to upload image to temporary storage');
+    }
+  }
+  
+  /**
+   * Delete an image file
    */
   static async deleteImage(imageUrl: string): Promise<boolean> {
-    // Irys doesn't support deletion - files are permanent
-    // In a production app, you might want to track "deleted" files in your database
-    console.log(`Note: Irys files are permanent, cannot delete: ${imageUrl}`);
-    return true; // Return true to not break existing code
+    if (imageUrl.includes('irys.xyz') || imageUrl.includes('arweave.net')) {
+      // Irys/Arweave files are permanent - cannot delete
+      console.log(`Note: Irys/Arweave files are permanent, cannot delete: ${imageUrl}`);
+      return true;
+    }
+    
+    if (imageUrl.includes('vercel-storage.com')) {
+      // TODO: Implement Vercel Blob deletion if needed
+      console.log(`Note: Vercel Blob deletion not implemented: ${imageUrl}`);
+      return true;
+    }
+    
+    return false;
   }
   
   /**

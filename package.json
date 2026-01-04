@@ -34,6 +34,7 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/mime-types": "^3.0.1",
     "@types/multer": "^2.0.0",
+    "@vercel/blob": "^2.0.0",
     "bcryptjs": "^3.0.3",
     "bufferutil": "^4.1.0",
     "clsx": "^2.1.1",

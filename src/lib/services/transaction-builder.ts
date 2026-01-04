@@ -61,8 +61,8 @@ export class TransactionBuilder {
   constructor() {
     this.connection = new Connection(RPC_CONFIG.HELIUS_RPC_URL, 'confirmed');
     
-    // Initialize UMI for Metaplex Core
-    this.umi = createUmi();
+    // Initialize UMI for Metaplex Core with proper RPC connection
+    this.umi = createUmi(RPC_CONFIG.HELIUS_RPC_URL);
     
     // Initialize delegate keypair if private key is provided
     const delegatePrivateKey = process.env.SOLANA_DELEGATE_PRIVATE_KEY;
@@ -82,8 +82,8 @@ export class TransactionBuilder {
         
         this.delegateKeypair = Keypair.fromSecretKey(privateKeyBytes);
         
-        // Set UMI identity
-        this.umi.use({
+        // Set UMI identity with proper keypair
+        this.umi = this.umi.use({
           install: (umi: any) => {
             umi.identity = fromWeb3JsKeypair(this.delegateKeypair!);
           }
@@ -520,10 +520,10 @@ export class TransactionBuilder {
       );
       transaction.add(updateInstruction);
 
-      // Set recent blockhash and fee payer
+      // Set recent blockhash and fee payer (delegate pays for metadata updates)
       const { blockhash } = await this.connection.getLatestBlockhash();
       transaction.recentBlockhash = blockhash;
-      transaction.feePayer = walletPubkey;
+      transaction.feePayer = this.delegateKeypair ? this.delegateKeypair.publicKey : walletPubkey;
 
       // Sign with delegate if available (delegate should have update authority)
       const delegateSignatures: string[] = [];

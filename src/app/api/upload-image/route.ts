@@ -26,6 +26,14 @@ export async function POST(request: NextRequest) {
         throw new Error('IRYS_PRIVATE_KEY not configured');
       }
 
+      // Check buffer size - if too large, compress or reject
+      if (buffer.length > 10 * 1024 * 1024) { // 10MB limit
+        return NextResponse.json(
+          { error: 'Image too large for permanent storage. Maximum size is 10MB.' },
+          { status: 413 }
+        );
+      }
+
       const keypair = (() => {
         if (uploadPrivateKey.startsWith('[') && uploadPrivateKey.endsWith(']')) {
           // JSON array format: [123, 45, 67, ...]
@@ -37,19 +45,47 @@ export async function POST(request: NextRequest) {
         }
       })();
 
-      // Upload to Irys for permanent blockchain storage
-      const irysService = new IrysUploadService(keypair);
-      const uploadResult = await irysService.uploadImage(buffer, contentType || 'image/png');
+      try {
+        // Upload to Irys for permanent blockchain storage
+        const irysService = new IrysUploadService(keypair);
+        const uploadResult = await irysService.uploadImage(buffer, contentType || 'image/png');
 
-      console.log(`✅ Image uploaded to Irys (permanent): ${uploadResult.url}`);
+        console.log(`✅ Image uploaded to Irys (permanent): ${uploadResult.url}`);
 
-      return NextResponse.json({
-        success: true,
-        imageUrl: uploadResult.url,
-        uploadId: uploadResult.id,
-        size: uploadResult.size,
-        storage: 'irys'
-      });
+        return NextResponse.json({
+          success: true,
+          imageUrl: uploadResult.url,
+          uploadId: uploadResult.id,
+          size: uploadResult.size,
+          storage: 'irys'
+        });
+      } catch (irysError) {
+        console.error('❌ Irys upload failed, falling back to Vercel Blob:', irysError);
+        
+        // Fallback to Vercel Blob if Irys fails
+        if (!process.env.BLOB_READ_WRITE_TOKEN) {
+          throw new Error('Both Irys and Vercel Blob are unavailable');
+        }
+
+        const timestamp = Date.now();
+        const sanitizedFilename = (filename || 'image.png').replace(/[^a-zA-Z0-9.-]/g, '_');
+        const blobFilename = `fallback/${timestamp}_${sanitizedFilename}`;
+
+        const blob = await put(blobFilename, buffer, {
+          access: 'public',
+          contentType: contentType || 'image/png',
+        });
+
+        console.log(`⚠️ Fallback: Image uploaded to Vercel Blob: ${blob.url}`);
+
+        return NextResponse.json({
+          success: true,
+          imageUrl: blob.url,
+          uploadId: blob.pathname,
+          size: buffer.length,
+          storage: 'vercel-blob-fallback'
+        });
+      }
 
     } else {
       // Use Vercel Blob for temporary/intermediate storage

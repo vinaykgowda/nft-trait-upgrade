@@ -90,7 +90,7 @@ export class TransactionBuilder {
           }
         });
         
-        console.log('✅ Delegate keypair initialized successfully');
+        console.log('✅ Delegate keypair initialized successfully - build trigger');
       } catch (error) {
         console.error('Failed to initialize delegate keypair:', error);
       }

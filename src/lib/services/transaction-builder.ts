@@ -440,10 +440,25 @@ export class TransactionBuilder {
         const tokenAmount = Number(amount);
         const mintPubkey = new PublicKey(tokenMintAddress);
         
+        // Get token mint info to determine decimals
+        const mintInfo = await this.connection.getAccountInfo(mintPubkey);
+        if (!mintInfo) {
+          throw new Error(`Token mint ${tokenMintAddress} not found`);
+        }
+        
+        // Parse mint data to get decimals (SPL token mint data structure)
+        // Decimals are at byte offset 44 in the mint account data
+        const decimals = mintInfo.data[44];
+        
+        // Convert human-readable amount to base units
+        const baseUnits = Math.floor(tokenAmount * Math.pow(10, decimals));
+        
         console.log('🪙 Creating SPL token payment instruction:', {
           from: from.toString(),
           to: to.toString(),
-          amount: `${tokenAmount} tokens`,
+          humanAmount: `${tokenAmount} tokens`,
+          decimals: decimals,
+          baseUnits: baseUnits,
           mint: tokenMintAddress
         });
         
@@ -460,7 +475,7 @@ export class TransactionBuilder {
           fromTokenAccount,
           toTokenAccount,
           from,
-          tokenAmount
+          baseUnits // Use base units, not human-readable amount
         );
       } catch (error) {
         console.error('❌ Error creating SPL token instruction:', error);

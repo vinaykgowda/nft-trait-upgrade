@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { IrysUploadService } from '@/lib/services/irys-upload';
-import { Keypair } from '@solana/web3.js';
+import { put } from '@vercel/blob';
 
 export async function POST(request: NextRequest) {
   try {
-    const { imageBuffer, contentType } = await request.json();
+    const { imageBuffer, contentType, filename } = await request.json();
 
     if (!imageBuffer) {
       return NextResponse.json(
@@ -16,32 +15,32 @@ export async function POST(request: NextRequest) {
     // Convert base64 back to buffer
     const buffer = Buffer.from(imageBuffer, 'base64');
 
-    // Get upload keypair from environment
-    const uploadPrivateKey = process.env.IRYS_PRIVATE_KEY;
-    if (!uploadPrivateKey) {
-      throw new Error('IRYS_PRIVATE_KEY not configured');
+    // Check if Vercel Blob is configured
+    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+      return NextResponse.json(
+        { error: 'Vercel Blob storage not configured' },
+        { status: 500 }
+      );
     }
 
-    const keypair = (() => {
-      if (uploadPrivateKey.startsWith('[') && uploadPrivateKey.endsWith(']')) {
-        // JSON array format: [123, 45, 67, ...]
-        return Keypair.fromSecretKey(new Uint8Array(JSON.parse(uploadPrivateKey)));
-      } else {
-        // Base58 string format
-        const bs58 = require('bs58');
-        return Keypair.fromSecretKey(bs58.decode(uploadPrivateKey));
-      }
-    })();
+    // Generate filename with timestamp
+    const timestamp = Date.now();
+    const sanitizedFilename = (filename || 'image.png').replace(/[^a-zA-Z0-9.-]/g, '_');
+    const blobFilename = `composed/${timestamp}_${sanitizedFilename}`;
 
-    // Upload to Irys
-    const irysService = new IrysUploadService(keypair);
-    const uploadResult = await irysService.uploadImage(buffer, contentType || 'image/png');
+    // Upload to Vercel Blob (handles large files better than Irys)
+    const blob = await put(blobFilename, buffer, {
+      access: 'public',
+      contentType: contentType || 'image/png',
+    });
+
+    console.log(`✅ Image uploaded to Vercel Blob: ${blob.url}`);
 
     return NextResponse.json({
       success: true,
-      imageUrl: uploadResult.url,
-      uploadId: uploadResult.id,
-      size: uploadResult.size
+      imageUrl: blob.url,
+      uploadId: blob.pathname,
+      size: buffer.length
     });
 
   } catch (error) {

@@ -12,7 +12,7 @@ const metadataUpdateSchema = z.object({
     trait_type: z.string(),
     value: z.string()
   })),
-  txSignature: z.string() // Payment transaction signature for verification
+  txSignature: z.string().optional() // Payment transaction signature for verification (optional)
 });
 
 export async function POST(request: NextRequest) {
@@ -35,18 +35,21 @@ export async function POST(request: NextRequest) {
       asset: assetId,
       imageUrl: newImageUrl,
       attributes: newAttributes.length,
-      paymentTx: txSignature
+      paymentTx: txSignature || 'none'
     });
 
     const transactionBuilder = new TransactionBuilder();
 
-    // Verify payment transaction was successful
-    const paymentStatus = await transactionBuilder.getTransactionStatus(txSignature);
-    if (!paymentStatus.confirmed) {
-      return apiResponse.error('Payment transaction not confirmed', 400);
+    // Verify payment transaction was successful (if provided)
+    if (txSignature) {
+      const paymentStatus = await transactionBuilder.getTransactionStatus(txSignature);
+      if (!paymentStatus.confirmed) {
+        return apiResponse.error('Payment transaction not confirmed', 400);
+      }
+      console.log('✅ Payment transaction confirmed, proceeding with metadata update');
+    } else {
+      console.log('⚠️ No payment transaction signature provided, proceeding with metadata update only');
     }
-
-    console.log('✅ Payment transaction confirmed, proceeding with metadata update');
 
     // Build metadata update transaction
     const partiallySignedTransaction = await transactionBuilder.buildMetadataUpdateTransaction({
@@ -85,7 +88,7 @@ export async function POST(request: NextRequest) {
         message: 'NFT metadata updated successfully',
         newImageUrl,
         newAttributes,
-        paymentTxSignature: txSignature
+        paymentTxSignature: txSignature || null
       });
     } else {
       console.error('❌ Metadata update failed:', result.error);

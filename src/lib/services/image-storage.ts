@@ -6,16 +6,18 @@ export interface ImageStorageOptions {
   category: string;
   rarity: string;
   filename: string;
-  permanent?: boolean; // true = Irys (permanent, costs more), false = Vercel Blob (temporary, cheaper)
+  permanent?: boolean; // true = Irys (blockchain permanent), false = Vercel Blob (persistent, cheaper)
 }
 
 export class ImageStorageService {
   /**
-   * Store an image file using either Irys (permanent) or Vercel Blob (temporary)
+   * Store an image file using either Vercel Blob (persistent, cheaper) or Irys (blockchain permanent)
    * Returns the public URL of the uploaded image
+   * 
+   * DEFAULT: Vercel Blob - Perfect for trait images that need to be accessible for NFT composition
    */
   static async storeImage(file: File, options: ImageStorageOptions): Promise<string> {
-    const { permanent = false } = options; // Default to cheaper Vercel Blob
+    const { permanent = false } = options; // Default to Vercel Blob (persistent & cheaper)
     
     if (permanent) {
       return this.storeImageIrys(file, options);
@@ -25,7 +27,8 @@ export class ImageStorageService {
   }
   
   /**
-   * Store image permanently on Irys (~$0.001-0.005 per image)
+   * Store image permanently on blockchain via Irys (~$0.001-0.005 per image)
+   * Use for: Final NFT images, metadata that needs blockchain permanence
    */
   private static async storeImageIrys(file: File, options: ImageStorageOptions): Promise<string> {
     try {
@@ -46,17 +49,20 @@ export class ImageStorageService {
       // Upload to Irys
       const result = await irysService.uploadImage(buffer, file.type);
       
-      console.log(`✅ Image uploaded to Irys (permanent): ${result.url}`);
+      console.log(`✅ Image uploaded to Irys (blockchain permanent): ${result.url}`);
       return result.url;
       
     } catch (error) {
       console.error('Failed to upload image to Irys:', error);
-      throw new Error('Failed to upload image to permanent storage');
+      throw new Error('Failed to upload image to blockchain storage');
     }
   }
   
   /**
-   * Store image temporarily on Vercel Blob (~$0.15/GB/month, much cheaper)
+   * Store image persistently on Vercel Blob (~$0.15/GB/month)
+   * Use for: Trait images, assets that need to be accessible for composition
+   * 
+   * PERFECT FOR YOUR USE CASE: Trait images that are used to build final NFTs
    */
   private static async storeImageVercelBlob(file: File, options: ImageStorageOptions): Promise<string> {
     try {
@@ -77,12 +83,12 @@ export class ImageStorageService {
         contentType: file.type,
       });
       
-      console.log(`✅ Image uploaded to Vercel Blob (temporary): ${blob.url}`);
+      console.log(`✅ Image uploaded to Vercel Blob (persistent): ${blob.url}`);
       return blob.url;
       
     } catch (error) {
       console.error('Failed to upload image to Vercel Blob:', error);
-      throw new Error('Failed to upload image to temporary storage');
+      throw new Error('Failed to upload image to persistent storage');
     }
   }
   

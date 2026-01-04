@@ -164,24 +164,38 @@ export async function PUT(
     } else {
       console.log(`✅ Using main token ID: ${priceTokenId}`);
     }
-    // Map category to slot ID - using actual database slot IDs
-    const categoryToSlotId: Record<string, string> = {
-      'Background': 'f66d1416-627a-4bfe-8a5d-3955c54cd7bb', // Background
-      'Speciality': 'fec12edb-9d95-4bf2-a1af-ee71107ffbd6', // Speciality
-      'Fur': 'd70ef5d2-32ed-45b5-b3d6-f7332b3bc9e2',        // Fur
-      'Clothes': '5f718366-c5e1-4b6a-97ba-a1bb2d159c20',     // Clothes
-      'Hand': 'beb44534-2c53-4472-bf15-0ac266f1082a',        // Hand
-      'Mouth': '5157637f-3808-4159-8cfc-4cb3dc6cc243',       // Mouth
-      'Mask': 'fcd3a481-ce27-4dfb-a1f3-1598fc3f8d40',        // Mask
-      'Headwear': 'ad761fe9-e5fd-49c9-a627-5171898d1323',    // Headwear
-      'Eyes': '39438a80-00e1-4328-887d-409e99684502',        // Eyes
-      'Eyewear': 'cf7b87d3-4be8-4ef0-b1e1-bd6f05e20d01',     // Eyewear
-      // Legacy mappings for backward compatibility
-      'Body': 'd70ef5d2-32ed-45b5-b3d6-f7332b3bc9e2',        // Map to Fur
-      'Hat': 'ad761fe9-e5fd-49c9-a627-5171898d1323',         // Map to Headwear
-    };
-
-    const slotId = categoryToSlotId[category] || categoryToSlotId['Fur']; // Default to Fur instead of Body
+    // Map category to slot ID - look up from database instead of hardcoding
+    const { query } = await import('@/lib/database');
+    
+    // Get the actual slot ID for this category
+    const slotResult = await query(`
+      SELECT id FROM trait_slots 
+      WHERE LOWER(name) = LOWER($1) 
+      LIMIT 1
+    `, [category]);
+    
+    let slotId: string;
+    
+    if (slotResult.rows.length > 0) {
+      slotId = slotResult.rows[0].id;
+      console.log(`✅ Found slot ID for ${category}: ${slotId}`);
+    } else {
+      // Fallback: try to find any slot that might match
+      const fallbackResult = await query(`
+        SELECT id, name FROM trait_slots 
+        ORDER BY layer_order 
+        LIMIT 1
+      `);
+      
+      if (fallbackResult.rows.length > 0) {
+        slotId = fallbackResult.rows[0].id;
+        console.log(`⚠️ Category "${category}" not found, using fallback slot: ${fallbackResult.rows[0].name} (${slotId})`);
+      } else {
+        return NextResponse.json({ 
+          error: `No trait slots found in database. Please create trait slots first.` 
+        }, { status: 400 });
+      }
+    }
 
     // Update trait data
     const updateData = {

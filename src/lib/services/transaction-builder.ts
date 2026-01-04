@@ -135,14 +135,11 @@ export class TransactionBuilder {
       transaction.recentBlockhash = blockhash;
       transaction.feePayer = walletPubkey;
 
-      // Skip delegate signing in development mode
+      // For payment-only transactions, delegate doesn't need to sign
+      // Only the user wallet needs to sign SPL token transfers
       const delegateSignatures: string[] = [];
-      if (this.delegateKeypair && process.env.NODE_ENV === 'production') {
-        transaction.partialSign(this.delegateKeypair);
-        delegateSignatures.push(this.delegateKeypair.publicKey.toString());
-      } else if (process.env.NODE_ENV === 'development') {
-        console.log('⚠️ Skipping delegate signing in development mode');
-      }
+      
+      console.log('💰 Payment-only transaction - delegate signing not required');
 
       return {
         transaction,

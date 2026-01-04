@@ -29,6 +29,13 @@ export async function GET(request: NextRequest) {
       ORDER BY token_symbol
     `);
 
+    console.log('🔍 Token fetch results:', {
+      mainTokens: mainTokensResult.rows.length,
+      projectTokens: projectTokensResult.rows.length,
+      mainTokensData: mainTokensResult.rows,
+      projectTokensData: projectTokensResult.rows
+    });
+
     const tokens: any[] = [];
 
     // Add main tokens (preferred)
@@ -46,9 +53,11 @@ export async function GET(request: NextRequest) {
       });
     });
 
-    // Add project tokens if no main tokens found
-    if (tokens.length === 0) {
-      projectTokensResult.rows.forEach((row: any) => {
+    // ALWAYS add project tokens as well (not just fallback)
+    projectTokensResult.rows.forEach((row: any) => {
+      // Avoid duplicates by checking if token symbol already exists
+      const existingToken = tokens.find(t => t.tokenSymbol === row.token_symbol);
+      if (!existingToken) {
         tokens.push({
           id: row.id,
           projectId: '',
@@ -60,8 +69,15 @@ export async function GET(request: NextRequest) {
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         });
-      });
-    }
+      }
+    });
+
+    console.log('🎯 Final tokens array:', tokens.map(t => ({ 
+      id: t.id, 
+      symbol: t.tokenSymbol, 
+      name: t.tokenName,
+      address: t.tokenAddress 
+    })));
 
     return NextResponse.json({
       success: true,

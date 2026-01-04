@@ -222,21 +222,22 @@ export function EnhancedPurchaseFlow({ selectedNFT, selectedTraits, onSuccess, o
       if (composeResponse.ok) {
         const { imageBuffer } = await composeResponse.json();
         
-        // Upload composed image to Irys
+        // Upload composed image to Irys (permanent storage for NFT metadata)
         const uploadResponse = await fetch('/api/upload-image', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             imageBuffer,
             assetId: selectedNFT.address,
-            traits: Object.values(selectedTraits)
+            traits: Object.values(selectedTraits),
+            permanent: true // Use Irys for permanent NFT metadata storage
           })
         });
 
         if (uploadResponse.ok) {
           const { imageUrl } = await uploadResponse.json();
           newImageUrl = imageUrl;
-          console.log('📸 Image uploaded to Irys:', imageUrl);
+          console.log('📸 Image uploaded to Irys (permanent):', imageUrl);
         }
       }
 

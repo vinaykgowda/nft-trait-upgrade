@@ -175,7 +175,8 @@ export function PurchaseFlow({ selectedNFT, selectedTraits, onSuccess, onCancel 
           body: JSON.stringify({
             imageBuffer,
             assetId: selectedNFT.address,
-            traits: Object.values(selectedTraits)
+            traits: Object.values(selectedTraits),
+            permanent: true // Use Irys for permanent NFT metadata storage
           })
         });
 

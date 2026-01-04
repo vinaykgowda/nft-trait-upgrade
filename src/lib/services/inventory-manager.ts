@@ -158,14 +158,19 @@ export class InventoryManager {
           };
         }
 
-        // Create purchase record
-        const purchase = await this.purchaseRepo.create({
+        // Create purchase record using domain model conversion
+        const purchaseDomain = {
           ...purchaseData,
           walletAddress: consumedReservation.wallet_address,
           assetId: consumedReservation.asset_id,
           traitId: consumedReservation.trait_id,
-          status: 'created',
-        }, client);
+          status: 'created' as const,
+        };
+        
+        const purchase = await this.purchaseRepo.create(
+          this.purchaseRepo.fromDomain(purchaseDomain),
+          client
+        );
 
         return {
           success: true,

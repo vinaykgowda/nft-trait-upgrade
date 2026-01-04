@@ -1,4 +1,4 @@
-import { CoreAsset, Trait } from '@/types';
+import { CoreAsset, Trait, TraitSlot } from '@/types';
 import { NFTMetadata, IrysUploadService } from './irys-upload';
 import { TraitSelection } from './preview';
 
@@ -6,11 +6,23 @@ export interface MetadataBuilderOptions {
   name?: string;
   description?: string;
   externalUrl?: string;
+  symbol?: string;
+  sellerFeeBasisPoints?: number;
   additionalAttributes?: Array<{
     trait_type: string;
     value: string;
   }>;
 }
+
+// Allowlisted domains for SSRF protection
+const ALLOWED_METADATA_DOMAINS = [
+  'gateway.irys.xyz',
+  'arweave.net',
+  'adznwylv2j3tfcl7.public.blob.vercel-storage.com', // Your Vercel Blob domain
+  'devnet.irys.xyz',
+  'node1.irys.xyz',
+  'node2.irys.xyz'
+];
 
 export class MetadataService {
   private irysService: IrysUploadService;
@@ -20,25 +32,66 @@ export class MetadataService {
   }
 
   /**
+   * Validates URL for SSRF protection
+   */
+  private validateMetadataUrl(url: string): boolean {
+    try {
+      const parsedUrl = new URL(url);
+      
+      // Only allow HTTPS
+      if (parsedUrl.protocol !== 'https:') {
+        console.warn('🚨 SSRF Protection: Only HTTPS URLs allowed for metadata');
+        return false;
+      }
+
+      // Check if domain is allowlisted
+      const isAllowed = ALLOWED_METADATA_DOMAINS.some(domain => 
+        parsedUrl.hostname === domain || parsedUrl.hostname.endsWith('.' + domain)
+      );
+
+      if (!isAllowed) {
+        console.warn('🚨 SSRF Protection: Domain not allowlisted:', parsedUrl.hostname);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.warn('🚨 SSRF Protection: Invalid URL format:', url);
+      return false;
+    }
+  }
+
+  /**
    * Builds NFT metadata JSON with trait attributes
    */
   buildMetadata(
     baseAsset: CoreAsset,
     appliedTraits: Trait[],
+    traitSlots: TraitSlot[] = [],
     options: MetadataBuilderOptions = {}
   ): Omit<NFTMetadata, 'image'> {
     const {
       name = baseAsset.name,
       description = `${baseAsset.name} with custom traits`,
       externalUrl,
+      symbol = baseAsset.symbol || 'NFT',
+      sellerFeeBasisPoints = baseAsset.seller_fee_basis_points || 500, // 5% default royalty
       additionalAttributes = []
     } = options;
 
-    // Build attributes from applied traits
-    const traitAttributes = appliedTraits.map(trait => ({
-      trait_type: trait.rarityTier.name, // Use rarity tier as trait type
-      value: trait.name
-    }));
+    // Build attributes from applied traits - FIXED: Use trait slot name as trait_type
+    const traitAttributes = appliedTraits.map(trait => {
+      // Find the slot for this trait to get the proper slot name
+      const slot = traitSlots.find(s => s.id === trait.slotId);
+      const slotName = slot?.name || trait.rarityTier.name; // Fallback to rarity if no slot found
+      
+      console.log(`🏷️ Building attribute: ${slotName} = ${trait.name}`);
+      
+      return {
+        trait_type: slotName, // FIXED: Use slot name instead of rarity tier name
+        value: trait.name     // Trait name as value
+      };
+    });
 
     // Combine with existing attributes and additional ones
     const existingAttributes = baseAsset.attributes || [];
@@ -48,9 +101,13 @@ export class MetadataService {
       ...additionalAttributes
     ];
 
+    console.log('📋 Final metadata attributes:', allAttributes);
+
     return {
       name,
       description,
+      symbol, // FIXED: Include symbol
+      seller_fee_basis_points: sellerFeeBasisPoints, // FIXED: Include royalty info
       external_url: externalUrl,
       attributes: allAttributes,
       properties: {
@@ -72,10 +129,11 @@ export class MetadataService {
   buildTraitMetadata(
     baseAsset: CoreAsset,
     selectedTraits: TraitSelection,
+    traitSlots: TraitSlot[] = [],
     options: MetadataBuilderOptions = {}
   ): Omit<NFTMetadata, 'image'> {
     const appliedTraits = Object.values(selectedTraits);
-    return this.buildMetadata(baseAsset, appliedTraits, options);
+    return this.buildMetadata(baseAsset, appliedTraits, traitSlots, options);
   }
 
   /**
@@ -85,18 +143,25 @@ export class MetadataService {
     imageBuffer: Buffer,
     baseAsset: CoreAsset,
     appliedTraits: Trait[],
+    traitSlots: TraitSlot[] = [],
     options: MetadataBuilderOptions = {}
   ): Promise<{ imageUri: string; metadataUri: string }> {
     try {
-      // Build metadata
-      const metadata = this.buildMetadata(baseAsset, appliedTraits, options);
+      // Build metadata with proper slot names
+      const metadata = this.buildMetadata(baseAsset, appliedTraits, traitSlots, options);
 
-      // Upload image and metadata to Irys
+      // Upload image and metadata to Irys - FIXED: Use JPEG format
       const { imageResult, metadataResult } = await this.irysService.uploadImageAndMetadata(
         imageBuffer,
         metadata,
-        'image/png'
+        'image/jpeg'
       );
+
+      console.log('✅ Metadata uploaded with proper files array:', {
+        imageUri: imageResult.url,
+        metadataUri: metadataResult.url,
+        filesPopulated: metadata.properties.files.length > 0
+      });
 
       return {
         imageUri: imageResult.url,
@@ -109,38 +174,64 @@ export class MetadataService {
   }
 
   /**
-   * Updates existing metadata with new traits
+   * Updates existing metadata with new traits - FIXED: SSRF protection
    */
   async updateMetadata(
     existingMetadataUri: string,
     imageBuffer: Buffer,
     baseAsset: CoreAsset,
     newTraits: Trait[],
+    traitSlots: TraitSlot[] = [],
     options: MetadataBuilderOptions = {}
   ): Promise<{ imageUri: string; metadataUri: string }> {
     try {
-      // Fetch existing metadata to preserve other properties
-      const existingResponse = await fetch(existingMetadataUri);
       let existingMetadata: Partial<NFTMetadata> = {};
       
-      if (existingResponse.ok) {
-        existingMetadata = await existingResponse.json();
+      // FIXED: SSRF protection - validate URL before fetching
+      if (this.validateMetadataUrl(existingMetadataUri)) {
+        console.log('🔒 Fetching existing metadata from validated URL:', existingMetadataUri);
+        
+        try {
+          const existingResponse = await fetch(existingMetadataUri, {
+            method: 'GET',
+            headers: {
+              'User-Agent': 'NFT-Trait-Marketplace/1.0'
+            },
+            // Add timeout to prevent hanging
+            signal: AbortSignal.timeout(10000) // 10 second timeout
+          });
+          
+          if (existingResponse.ok) {
+            existingMetadata = await existingResponse.json();
+            console.log('✅ Successfully fetched existing metadata');
+          } else {
+            console.warn('⚠️ Failed to fetch existing metadata, using defaults');
+          }
+        } catch (fetchError) {
+          console.warn('⚠️ Error fetching existing metadata, using defaults:', fetchError);
+        }
+      } else {
+        console.warn('🚨 SSRF Protection: Blocked potentially unsafe metadata URL');
       }
 
-      // Build new metadata, preserving existing properties where appropriate
-      const newMetadata = this.buildMetadata(baseAsset, newTraits, {
+      // Build new metadata with proper slot names, preserving existing properties where appropriate
+      const newMetadata = this.buildMetadata(baseAsset, newTraits, traitSlots, {
         ...options,
         name: options.name || existingMetadata.name || baseAsset.name,
         description: options.description || existingMetadata.description,
-        externalUrl: options.externalUrl || existingMetadata.external_url
+        externalUrl: options.externalUrl || existingMetadata.external_url,
+        symbol: options.symbol || existingMetadata.symbol || baseAsset.symbol,
+        sellerFeeBasisPoints: options.sellerFeeBasisPoints || existingMetadata.seller_fee_basis_points || baseAsset.seller_fee_basis_points
       });
 
-      // Upload new image and metadata
+      // Upload new image and metadata - FIXED: Use JPEG format
       const { imageResult, metadataResult } = await this.irysService.uploadImageAndMetadata(
         imageBuffer,
         newMetadata,
-        'image/png'
+        'image/jpeg'
       );
+
+      console.log('✅ Metadata updated with SSRF protection and proper format');
 
       return {
         imageUri: imageResult.url,

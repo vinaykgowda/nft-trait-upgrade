@@ -5,6 +5,8 @@ export interface CoreAsset {
   name: string;
   image: string;
   collection?: string;
+  symbol?: string;
+  seller_fee_basis_points?: number;
   attributes?: Attribute[];
 }
 

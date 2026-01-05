@@ -115,7 +115,7 @@ export class CoreAssetUpdateService {
         const { HeliusService } = await import('./helius');
         const heliusMetadata = await HeliusService.getNFTMetadata(assetAddress);
         if (heliusMetadata) {
-          existingData = heliusMetadata;
+          existingData = heliusMetadata as Partial<CoreAssetMetadata>;
           console.log('✅ Used Helius metadata as base');
         }
       } catch (error) {

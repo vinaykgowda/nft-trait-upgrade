@@ -135,16 +135,11 @@ export async function POST(request: NextRequest) {
     const coreAssetService = new CoreAssetUpdateService(connection, updateKeypair);
     const updateResult = await coreAssetService.updateAssetWithTraits(
       assetId,
-      metadataResult.url,
-      {
-        name: metadata.name,
-        description: metadata.description,
-        image: newImageUrl,
-        attributes: metadata.attributes.map(attr => ({
-          trait_type: attr.trait_type,
-          value: String(attr.value)
-        }))
-      }
+      newImageUrl,
+      metadata.attributes.map(attr => ({
+        trait_type: attr.trait_type,
+        value: String(attr.value)
+      }))
     );
 
     return NextResponse.json({

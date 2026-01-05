@@ -185,7 +185,7 @@ export class CoreAssetUpdateService {
       console.log('✅ Core asset updated successfully:', result.signature);
 
       return {
-        signature: result.signature,
+        signature: result.signature.toString(),
         success: true
       };
 

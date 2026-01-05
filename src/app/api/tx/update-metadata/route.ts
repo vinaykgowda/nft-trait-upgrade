@@ -187,7 +187,7 @@ export async function POST(request: NextRequest) {
         throw new Error('SOLANA_DELEGATE_PRIVATE_KEY not configured');
       }
       
-      let delegateKeypair: Keypair;
+      let delegateKeypair: InstanceType<typeof Keypair>;
       let privateKeyBytes: Uint8Array;
       if (delegatePrivateKey.startsWith('[') && delegatePrivateKey.endsWith(']')) {
         privateKeyBytes = Uint8Array.from(JSON.parse(delegatePrivateKey));

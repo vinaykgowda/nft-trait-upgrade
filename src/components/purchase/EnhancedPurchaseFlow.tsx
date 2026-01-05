@@ -251,6 +251,21 @@ export function EnhancedPurchaseFlow({ selectedNFT, selectedTraits, onSuccess, o
       updateState({ updatedImageUrl: newImageUrl });
 
       // Update NFT metadata with new image and traits
+      // First, we need to map slot IDs to slot names for proper metadata
+      const slotMappingResponse = await fetch('/api/trait-slots');
+      let slotMapping: Record<string, string> = {};
+      
+      if (slotMappingResponse.ok) {
+        const slotsData = await slotMappingResponse.json();
+        slotMapping = slotsData.data?.reduce((acc: Record<string, string>, slot: any) => {
+          acc[slot.id] = slot.name;
+          return acc;
+        }, {}) || {};
+        console.log('📋 Slot mapping loaded:', slotMapping);
+      } else {
+        console.warn('⚠️ Could not load slot mapping, using fallback names');
+      }
+
       const metadataResponse = await fetch('/api/tx/update-metadata', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -258,10 +273,14 @@ export function EnhancedPurchaseFlow({ selectedNFT, selectedTraits, onSuccess, o
           walletAddress: publicKey.toString(),
           assetId: selectedNFT.address,
           newImageUrl: newImageUrl,
-          newAttributes: Object.values(selectedTraits).map(trait => ({
-            trait_type: trait.slotId, // Use slotId since slotName is not available
-            value: trait.name
-          })),
+          newAttributes: Object.values(selectedTraits).map(trait => {
+            // Use the slot mapping to get the proper slot name
+            const slotName = slotMapping[trait.slotId] || trait.slotId;
+            return {
+              trait_type: slotName,
+              value: trait.name
+            };
+          }),
           txSignature: txSignature
         })
       });

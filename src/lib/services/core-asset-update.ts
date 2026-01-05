@@ -6,6 +6,7 @@ import {
   none,
   Umi,
   signerIdentity,
+  createSignerFromKeypair,
 } from '@metaplex-foundation/umi';
 import { createUmi as createUmiBundle } from '@metaplex-foundation/umi-bundle-defaults';
 import { fromWeb3JsKeypair } from '@metaplex-foundation/umi-web3js-adapters';
@@ -63,8 +64,12 @@ export class CoreAssetUpdateService {
     // Initialize UMI with proper bundle and Core plugin
     const umiRpcUrl = rpcUrl || connection.rpcEndpoint;
     this.umi = createUmiBundle(umiRpcUrl)
-      .use(mplCore())
-      .use(signerIdentity(fromWeb3JsKeypair(updateAuthority)));
+      .use(mplCore());
+    
+    // Set the signer identity
+    const umiKeypair = fromWeb3JsKeypair(updateAuthority);
+    const signer = createSignerFromKeypair(this.umi, umiKeypair);
+    this.umi = this.umi.use(signerIdentity(signer));
     
     console.log('✅ Core asset update service initialized with authority:', updateAuthority.publicKey.toString());
   }

@@ -198,9 +198,10 @@ export class TraitPurchaseWorkflow {
       );
 
       // 10. Update Core asset with new metadata URI (simplified)
-      const updateResult = await this.services.coreAssetUpdate.updateAssetWithTrait(
+      const updateResult = await this.services.coreAssetUpdate.updateAssetWithTraits(
         assetId,
-        metadataUploadResult.url
+        imageUploadResult.url,
+        [] // Empty attributes array for simplified test
       );
 
       if (!updateResult.signature) {

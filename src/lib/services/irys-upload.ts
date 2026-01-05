@@ -82,8 +82,15 @@ export class IrysUploadService {
       const price = await irys.getPrice(imageBuffer.length);
       console.log(`💸 Upload cost estimate: ${price} atomic units`);
 
-      if (balance.lt(price)) {
+      // Convert balance and price to BigInt for proper comparison
+      const balanceBigInt = BigInt(balance.toString());
+      const priceBigInt = BigInt(price.toString());
+
+      if (balanceBigInt < priceBigInt) {
         console.warn('⚠️ Insufficient balance for upload, attempting anyway...');
+        console.warn(`⚠️ Balance: ${balanceBigInt.toString()}, Required: ${priceBigInt.toString()}`);
+      } else {
+        console.log(`✅ Sufficient balance for upload: ${balanceBigInt.toString()} >= ${priceBigInt.toString()}`);
       }
 
       // Upload the image

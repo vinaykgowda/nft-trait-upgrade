@@ -101,24 +101,48 @@ export class ImageCompositionService {
           }
 
           console.log(`Fetching trait image: ${traitImageUrl}`);
-          const traitResponse = await fetch(traitImageUrl);
-          if (!traitResponse.ok) {
-            console.error(`Failed to fetch trait image: ${traitImageUrl} - Status: ${traitResponse.status}`);
+          
+          // Add timeout to prevent hanging
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+          
+          try {
+            const traitResponse = await fetch(traitImageUrl, { 
+              signal: controller.signal,
+              headers: {
+                'User-Agent': 'NFT-Trait-Marketplace/1.0'
+              }
+            });
+            clearTimeout(timeoutId);
+            
+            if (!traitResponse.ok) {
+              console.error(`Failed to fetch trait image: ${traitImageUrl} - Status: ${traitResponse.status}`);
+              continue;
+            }
+            
+            const traitBuffer = Buffer.from(await traitResponse.arrayBuffer());
+            console.log(`✅ Fetched trait image: ${trait.name} (${traitBuffer.length} bytes)`);
+            
+            // Resize trait to match dimensions and ensure it has alpha channel
+            const resizedTraitBuffer = await sharp(traitBuffer)
+              .resize(width, height)
+              .png()
+              .toBuffer();
+
+            layers.push({
+              input: resizedTraitBuffer,
+              top: 0,
+              left: 0
+            });
+          } catch (fetchError) {
+            clearTimeout(timeoutId);
+            if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+              console.error(`Timeout fetching trait image: ${traitImageUrl}`);
+            } else {
+              console.error(`Network error fetching trait image: ${traitImageUrl}`, fetchError);
+            }
             continue;
           }
-          const traitBuffer = Buffer.from(await traitResponse.arrayBuffer());
-          
-          // Resize trait to match dimensions and ensure it has alpha channel
-          const resizedTraitBuffer = await sharp(traitBuffer)
-            .resize(width, height)
-            .png()
-            .toBuffer();
-
-          layers.push({
-            input: resizedTraitBuffer,
-            top: 0,
-            left: 0
-          });
         } catch (error) {
           console.error(`Failed to load trait image: ${trait.imageLayerUrl}`, error);
           // Continue with other traits even if one fails
@@ -127,16 +151,22 @@ export class ImageCompositionService {
 
       // Apply all layers at once
       if (layers.length > 0) {
+        console.log(`🎨 Applying ${layers.length} trait layers to composition`);
         compositeImage = compositeImage.composite(layers);
+      } else {
+        console.warn('⚠️ No trait layers to apply - using base image only');
       }
 
       // Generate final buffer
+      console.log(`🎨 Generating final ${format} image buffer...`);
       let imageBuffer: Buffer;
       if (format === 'jpeg') {
         imageBuffer = await compositeImage.jpeg({ quality }).toBuffer();
       } else {
         imageBuffer = await compositeImage.png().toBuffer();
       }
+
+      console.log(`✅ Image composition completed: ${imageBuffer.length} bytes, ${width}x${height} ${format}`);
 
       return {
         imageBuffer,

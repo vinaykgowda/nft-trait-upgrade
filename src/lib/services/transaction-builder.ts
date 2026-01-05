@@ -20,6 +20,7 @@ import {
   none,
   Umi,
   createSignerFromKeypair,
+  signerIdentity,
 } from '@metaplex-foundation/umi';
 import { createUmi as createUmiBundle } from '@metaplex-foundation/umi-bundle-defaults';
 import { fromWeb3JsKeypair, toWeb3JsInstruction } from '@metaplex-foundation/umi-web3js-adapters';
@@ -86,14 +87,12 @@ export class TransactionBuilder {
         
         this.delegateKeypair = Keypair.fromSecretKey(privateKeyBytes);
         
-        // Set UMI identity with proper keypair
-        this.umi = this.umi.use({
-          install: (umi: any) => {
-            umi.identity = fromWeb3JsKeypair(this.delegateKeypair!);
-          }
-        });
+        // Set UMI identity with proper signer
+        const umiKeypair = fromWeb3JsKeypair(this.delegateKeypair);
+        const signer = createSignerFromKeypair(this.umi, umiKeypair);
+        this.umi = this.umi.use(signerIdentity(signer));
         
-        console.log('✅ Delegate keypair initialized successfully - build trigger');
+        console.log('✅ Delegate keypair and UMI signer initialized successfully - build trigger');
       } catch (error) {
         console.error('Failed to initialize delegate keypair:', error);
       }
@@ -329,12 +328,12 @@ export class TransactionBuilder {
       // Create metadata JSON string
       const metadataJson = JSON.stringify(newMetadata);
 
-      // Create the update instruction using Metaplex Core
+      // Create the update instruction using Metaplex Core - only update name, no URI to keep transaction small
       const updateInstruction = updateV1(this.umi, {
         asset: assetPublicKey,
         authority: createSignerFromKeypair(this.umi, fromWeb3JsKeypair(this.delegateKeypair)),
         newName: some(newMetadata.name),
-        newUri: some(metadataJson), // Store metadata directly in the asset
+        // Don't update URI to keep transaction small - metadata will be in memo
       });
 
       // Convert UMI instruction to Web3.js instruction

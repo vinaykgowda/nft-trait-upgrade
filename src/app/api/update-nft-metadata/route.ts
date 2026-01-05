@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
 
     // Update Core Asset with new metadata URI
     const coreAssetService = new CoreAssetUpdateService(connection, updateKeypair);
-    const updateResult = await coreAssetService.updateAssetWithTrait(
+    const updateResult = await coreAssetService.updateAssetWithTraits(
       assetId,
       metadataResult.url,
       {

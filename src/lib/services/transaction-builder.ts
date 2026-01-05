@@ -19,6 +19,7 @@ import {
   some,
   none,
   Umi,
+  createSignerFromKeypair,
 } from '@metaplex-foundation/umi';
 import { createUmi as createUmiBundle } from '@metaplex-foundation/umi-bundle-defaults';
 import { fromWeb3JsKeypair, toWeb3JsInstruction } from '@metaplex-foundation/umi-web3js-adapters';
@@ -331,7 +332,7 @@ export class TransactionBuilder {
       // Create the update instruction using Metaplex Core
       const updateInstruction = updateV1(this.umi, {
         asset: assetPublicKey,
-        authority: some(fromWeb3JsKeypair(this.delegateKeypair)),
+        authority: some(createSignerFromKeypair(this.umi, fromWeb3JsKeypair(this.delegateKeypair))),
         newName: some(newMetadata.name),
         newUri: some(metadataJson), // Store metadata directly in the asset
       });

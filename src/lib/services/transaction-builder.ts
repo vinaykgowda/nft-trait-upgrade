@@ -332,7 +332,7 @@ export class TransactionBuilder {
       // Create the update instruction using Metaplex Core
       const updateInstruction = updateV1(this.umi, {
         asset: assetPublicKey,
-        authority: some(createSignerFromKeypair(this.umi, fromWeb3JsKeypair(this.delegateKeypair))),
+        authority: createSignerFromKeypair(this.umi, fromWeb3JsKeypair(this.delegateKeypair)),
         newName: some(newMetadata.name),
         newUri: some(metadataJson), // Store metadata directly in the asset
       });

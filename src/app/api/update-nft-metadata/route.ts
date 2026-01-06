@@ -1,163 +1,135 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
+import { Connection, Keypair } from '@solana/web3.js';
+import bs58 from 'bs58';
+
 import { CoreAssetUpdateService } from '@/lib/services/core-asset-update';
 import { IrysUploadService, NFTMetadata } from '@/lib/services/irys-upload';
-import { Connection, Keypair } from '@solana/web3.js';
-import { Trait } from '@/types';
 import { getTraitSlotRepository } from '@/lib/repositories';
+
+const BodySchema = z.object({
+  assetId: z.string().min(32),
+  newImageUrl: z.string().url(),
+  newTraits: z.array(z.any()), // expects items with { slotId, name } at least
+  originalTraits: z.array(z.any()).optional(), // expects items like { trait_type, value }
+  txSignature: z.string().optional(),
+});
+
+function loadUpdateAuthority(): Keypair {
+  const raw = process.env.UPDATE_AUTHORITY_PRIVATE_KEY;
+  if (!raw) throw new Error('UPDATE_AUTHORITY_PRIVATE_KEY not configured');
+
+  const t = raw.trim();
+  if (t.startsWith('[')) {
+    return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(t)));
+  }
+  return Keypair.fromSecretKey(bs58.decode(t));
+}
 
 export async function POST(request: NextRequest) {
   try {
-    const { assetId, newImageUrl, newTraits, originalTraits, txSignature } = await request.json();
-
-    if (!assetId || !newImageUrl || !Array.isArray(newTraits)) {
+    let bodyJson: unknown;
+    try {
+      bodyJson = await request.json();
+    } catch {
       return NextResponse.json(
-        { error: 'Missing required fields: assetId, newImageUrl, newTraits' },
+        { error: 'Invalid JSON body. Send Content-Type: application/json' },
         { status: 400 }
       );
     }
 
-    // Get update authority keypair
-    const updatePrivateKey = process.env.UPDATE_AUTHORITY_PRIVATE_KEY;
-    if (!updatePrivateKey) {
-      throw new Error('UPDATE_AUTHORITY_PRIVATE_KEY not configured');
+    const parsed = BodySchema.safeParse(bodyJson);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Invalid request body', details: parsed.error.flatten() },
+        { status: 400 }
+      );
     }
 
-    const updateKeypair = (() => {
-      if (updatePrivateKey.startsWith('[') && updatePrivateKey.endsWith(']')) {
-        // JSON array format: [123, 45, 67, ...]
-        return Keypair.fromSecretKey(new Uint8Array(JSON.parse(updatePrivateKey)));
-      } else {
-        // Base58 string format
-        const bs58 = require('bs58');
-        return Keypair.fromSecretKey(bs58.decode(updatePrivateKey));
-      }
-    })();
+    const { assetId, newImageUrl, newTraits, originalTraits, txSignature } = parsed.data;
 
-    // Get Solana connection
     const rpcUrl = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
-    const connection = new Connection(rpcUrl);
+    const connection = new Connection(rpcUrl, 'confirmed');
+    const updateKeypair = loadUpdateAuthority();
 
-    // Get trait slots for proper naming
+    // Load trait slots (ordered) for consistent attributes
     const traitSlotRepo = getTraitSlotRepository();
     const slots = await traitSlotRepo.findAllOrdered();
     const domainSlots = slots.map(slot => traitSlotRepo.toDomain(slot));
 
-    // Create a map of slot ID to slot name
-    const slotIdToName = new Map();
-    domainSlots.forEach(slot => {
-      slotIdToName.set(slot.id, slot.name);
-    });
-
-    // Build complete trait attributes - include ALL slots
-    const completeAttributes: Array<{ trait_type: string; value: string }> = [];
-    
-    // Create a map of updated traits by slot ID
-    const updatedTraitsBySlot = new Map();
-    newTraits.forEach((trait: any) => {
-      if (trait.slotId) {
-        updatedTraitsBySlot.set(trait.slotId, trait);
-      }
-    });
-
-    // Create a map of original traits by slot name (from Helius data)
-    const originalTraitsBySlotName = new Map();
-    if (originalTraits && Array.isArray(originalTraits)) {
-      originalTraits.forEach((attr: any) => {
-        if (attr.trait_type && attr.value) {
-          originalTraitsBySlotName.set(attr.trait_type, attr.value);
-        }
-      });
+    // Map: slotId -> updatedTrait
+    const updatedTraitsBySlotId = new Map<string, any>();
+    for (const t of newTraits) {
+      if (t?.slotId) updatedTraitsBySlotId.set(t.slotId, t);
     }
 
-    // Process each slot to build complete attributes
-    domainSlots.forEach(slot => {
-      const slotName = slot.name;
-      let traitValue = 'Blank'; // Default value
+    // Map: trait_type -> value (from helius/originalTraits)
+    const originalByTraitType = new Map<string, any>();
+    if (Array.isArray(originalTraits)) {
+      for (const a of originalTraits) {
+        if (a?.trait_type) originalByTraitType.set(a.trait_type, a.value);
+      }
+    }
 
-      // Check if this slot has an updated trait
-      if (updatedTraitsBySlot.has(slot.id)) {
-        const updatedTrait = updatedTraitsBySlot.get(slot.id);
-        traitValue = updatedTrait.name;
-      } else if (originalTraitsBySlotName.has(slotName)) {
-        // Keep the original trait value if no update
-        traitValue = originalTraitsBySlotName.get(slotName);
+    // Build complete attributes for ALL slots
+    const completeAttributes: Array<{ trait_type: string; value: string }> = [];
+    for (const slot of domainSlots) {
+      const slotName = slot.name;
+      let val = 'Blank';
+
+      const updated = updatedTraitsBySlotId.get(slot.id);
+      if (updated?.name) {
+        val = updated.name;
+      } else if (originalByTraitType.has(slotName)) {
+        val = originalByTraitType.get(slotName) ?? 'Blank';
       }
 
-      // Add to attributes (even if Blank)
-      completeAttributes.push({
-        trait_type: slotName,
-        value: String(traitValue)
-      });
-    });
+      completeAttributes.push({ trait_type: slotName, value: String(val) });
+    }
 
-    // Get creator information and collection details from environment
-    const creatorAddress = process.env.NFT_CREATOR_ADDRESS || updateKeypair.publicKey.toString();
+    const creatorAddress =
+      process.env.NFT_CREATOR_ADDRESS || updateKeypair.publicKey.toBase58();
     const collectionSymbol = process.env.NFT_COLLECTION_SYMBOL || 'PGV2';
-    const sellerFeeBasisPoints = parseInt(process.env.NFT_SELLER_FEE_BASIS_POINTS || '690');
-    
-    // Create new metadata with complete trait structure matching your format
+    const sellerFeeBasisPoints = parseInt(process.env.NFT_SELLER_FEE_BASIS_POINTS || '690', 10);
+
+    // ✅ Build metadata JSON in your desired format
     const metadata: NFTMetadata = {
-      name: `Updated NFT ${assetId.slice(0, 8)}`,
-      description: `NFT updated with new traits via trait marketplace. Transaction: ${txSignature}`,
+      name: `PGV2 #${assetId.slice(0, 6)}`, // (optional) your naming logic
+      description:
+        `Pepe Gods V2 - Arise from the Ashes, is a refined artistic evolution of the original Pepe Gods collection, created by Pepeverse and supported by a lot of utilities. ` +
+        (txSignature ? `Payment Tx: ${txSignature}` : ''),
       symbol: collectionSymbol,
       seller_fee_basis_points: sellerFeeBasisPoints,
       image: newImageUrl,
       external_url: process.env.NEXT_PUBLIC_APP_URL || '',
       attributes: completeAttributes,
       properties: {
-        files: [
-          {
-            uri: newImageUrl,
-            type: 'image/png'
-          }
-        ],
+        files: [{ uri: newImageUrl, type: 'image/png' }],
         category: 'image',
-        creators: [
-          {
-            address: creatorAddress,
-            share: 100
-          }
-        ]
-      }
+        creators: [{ address: creatorAddress, share: 100 }],
+      },
     };
 
-    console.log('📝 Creating metadata with complete trait structure:');
-    console.log('   - Total attributes:', completeAttributes.length);
-    completeAttributes.forEach(attr => {
-      console.log(`   - ${attr.trait_type}: ${attr.value}`);
-    });
+    // ✅ Upload metadata JSON to Irys (returns metadata URI)
+    const irys = new IrysUploadService();
+    const metadataResult = await irys.uploadMetadata(metadata);
 
-    // Upload metadata to Irys
-    const irysService = new IrysUploadService();
-    const metadataResult = await irysService.uploadMetadata(metadata);
-
-    // Update Core Asset with new metadata URI
-    const coreAssetService = new CoreAssetUpdateService(connection, updateKeypair);
-    const updateResult = await coreAssetService.updateAssetWithTraits(
-      assetId,
-      newImageUrl,
-      metadata.attributes.map(attr => ({
-        trait_type: attr.trait_type,
-        value: String(attr.value)
-      }))
-    );
+    // ✅ Update Core asset URI to the Irys metadata URL (small tx)
+    const core = new CoreAssetUpdateService(connection, updateKeypair);
+    const updateResult = await core.updateAssetUri(assetId, metadataResult.url);
 
     return NextResponse.json({
       success: true,
+      assetId,
       metadataUri: metadataResult.url,
       updateSignature: updateResult.signature,
-      metadata,
-      updatedSlots: Array.from(updatedTraitsBySlot.keys()),
-      totalAttributes: completeAttributes.length
+      totalAttributes: completeAttributes.length,
+      updatedSlotIds: Array.from(updatedTraitsBySlotId.keys()),
     });
-
-  } catch (error) {
-    console.error('Error updating NFT metadata:', error);
+  } catch (error: any) {
+    console.error('❌ Update metadata route failed:', error);
     return NextResponse.json(
-      { 
-        error: 'Failed to update NFT metadata',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
+      { error: error?.message || 'Failed', details: String(error) },
       { status: 500 }
     );
   }

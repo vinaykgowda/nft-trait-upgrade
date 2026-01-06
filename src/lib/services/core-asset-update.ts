@@ -1,9 +1,7 @@
-import { Connection, Keypair, PublicKey } from '@solana/web3.js';
+import { Connection, Keypair } from '@solana/web3.js';
 import { 
-  createUmi,
   publicKey,
   some,
-  none,
   Umi,
   signerIdentity,
   createSignerFromKeypair,
@@ -17,6 +15,7 @@ import {
   AssetV1,
   mplCore,
 } from '@metaplex-foundation/mpl-core';
+
 
 export interface CoreAssetMetadata {
   name: string;
@@ -43,12 +42,10 @@ export interface CoreAssetMetadata {
 }
 
 export class CoreAssetUpdateService {
-  private connection: Connection;
   private umi: Umi;
   private updateAuthority: Keypair;
 
   constructor(connection: Connection, updateAuthority: Keypair, rpcUrl?: string) {
-    this.connection = connection;
     this.updateAuthority = updateAuthority;
 
     const endpoint = rpcUrl || connection.rpcEndpoint;
@@ -61,6 +58,37 @@ export class CoreAssetUpdateService {
     
     console.log('✅ Core asset update service initialized with authority:', updateAuthority.publicKey.toString());
   }
+
+  async updateAssetUri(
+  assetAddress: string,
+  metadataUri: string
+): Promise<{ signature: string; success: boolean }> {
+  try {
+    console.log('🧾 Updating Core Asset URI:', { assetAddress, metadataUri });
+
+    const assetPublicKey = publicKey(assetAddress);
+
+    const builder = updateV1(this.umi, {
+      asset: assetPublicKey,
+      newUri: some(metadataUri),
+    });
+
+    // ✅ This handles build, sign, send, confirm in one go (and avoids strategy typing issues)
+    const result = await builder.sendAndConfirm(this.umi, {
+      send: { skipPreflight: false },
+      confirm: { commitment: 'confirmed' },
+    });
+
+    const sigStr = result.signature.toString();
+
+    console.log('✅ Core Asset URI updated:', sigStr);
+
+    return { signature: sigStr, success: true };
+  } catch (e: any) {
+    console.error('❌ Core Asset URI update failed:', e);
+    throw new Error(`Core Asset URI update failed: ${e?.message || String(e)}`);
+  }
+}
 
   async verifyUpdateAuthority(assetAddress: string): Promise<boolean> {
     try {

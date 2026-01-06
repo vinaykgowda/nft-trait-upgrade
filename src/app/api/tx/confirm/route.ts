@@ -102,14 +102,11 @@ export async function POST(request: NextRequest) {
       console.log('📡 Sending atomic transaction to Solana...');
 
       // Send the transaction to the network
-      const result = await transactionBuilder.sendAndConfirmTransaction(
-        {
-          transaction,
-          requiredSignatures: [reservation.walletAddress],
-          delegateSignatures: [], // Would be populated from build step
-        },
-        new Uint8Array() // User signature already in transaction
-      );
+      const result = await transactionBuilder.sendAndConfirmTransaction({
+        transaction,
+        requiredSignatures: [reservation.walletAddress],
+        delegateSignatures: [], // Would be populated from build step
+      });
 
       if (result.success) {
         console.log('✅ Atomic transaction confirmed:', result.signature);

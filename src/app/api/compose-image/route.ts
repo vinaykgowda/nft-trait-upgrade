@@ -1,85 +1,202 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
+
 import { ImageCompositionService } from '@/lib/services/image-composition';
+import { HeliusService } from '@/lib/services/helius';
+
+import { TraitRepository } from '@/lib/repositories/traits';
 import { getTraitSlotRepository } from '@/lib/repositories';
-import { Trait } from '@/types';
 
-export async function POST(request: NextRequest) {
-  try {
-    const { baseImageUrl, selectedTraits, assetId } = await request.json();
+import type { Trait, TraitSlot } from '@/types';
 
-    if (!baseImageUrl || !selectedTraits) {
-      return NextResponse.json(
-        { error: 'Missing required fields: baseImageUrl, selectedTraits' },
-        { status: 400 }
-      );
+// In your codebase, TraitSelection is basically slotId -> Trait
+type TraitSelection = Record<string, Trait>;
+
+const schema = z.object({
+  baseImageUrl: z.string().url(),
+  assetId: z.string().min(32),
+  // can be either TraitSelection object or array of trait IDs
+  selectedTraits: z.union([z.record(z.any()), z.array(z.string())]),
+  width: z.number().optional(),
+  height: z.number().optional(),
+  format: z.enum(['png', 'jpeg']).optional(),
+  quality: z.number().optional(),
+  forceTransparentBase: z.boolean().optional(),
+});
+
+async function getAllSlots(slotRepo: any): Promise<TraitSlot[]> {
+  // Try common method names without breaking TS
+  const candidates = [
+    'findAll',
+    'getAll',
+    'listAll',
+    'getAllSlots',
+    'findAllSlots',
+    'findActiveSlots',
+    'listSlots',
+  ];
+
+  for (const m of candidates) {
+    if (typeof slotRepo?.[m] === 'function') {
+      const result = await slotRepo[m]();
+      if (Array.isArray(result)) return result;
     }
+  }
+
+  throw new Error(
+    'TraitSlotRepository does not expose a supported method to list slots. Expected one of: ' +
+      candidates.join(', ')
+  );
+}
+
+async function resolveTraitsByIds(traitRepo: any, ids: string[]): Promise<Trait[]> {
+  // Prefer bulk methods if available
+  const traits: Trait[] = [];
+  const bulkCandidates = ['findByIds', 'getByIds', 'findManyByIds', 'listByIds'];
+  for (const m of bulkCandidates) {
+    if (typeof traitRepo?.[m] === 'function') {
+      const result = await traitRepo[m](ids);
+      if (Array.isArray(result)) return result;
+    }
+  }
+
+  // Fallback to single lookup
+  const singleCandidates = ['findById', 'getById', 'findOneById'];
+  for (const id of ids) {
+    let trait: Trait | null = null;
+    for (const m of singleCandidates) {
+      if (typeof traitRepo?.[m] === 'function') {
+        trait = await traitRepo[m](id);
+        if (trait) break;
+      }
+    }
+    if (trait) traits.push(trait);
+  }
+
+  // eslint-disable-next-line no-undef
+  return traits;
+}
+
+async function findTraitByTypeAndValue(traitRepo: any, traitType: string, value: string): Promise<Trait | null> {
+  const candidates = [
+    'findByTraitTypeAndValue',
+    'findByTypeAndValue',
+    'findBySlotAndValue',
+    'findBySlotNameAndValue',
+    'findByTraitTypeAndName',
+    'findByTypeAndName',
+    'findBySlotAndName',
+    'findBySlotNameAndName',
+    'findByTraitTypeValue', // sometimes compact
+  ];
+
+  for (const m of candidates) {
+    if (typeof traitRepo?.[m] === 'function') {
+      const res = await traitRepo[m](traitType, value);
+      if (res) return res;
+    }
+  }
+
+  // As a last resort, try a generic search API if present
+  if (typeof traitRepo?.search === 'function') {
+    const res = await traitRepo.search({ traitType, value });
+    if (Array.isArray(res) && res.length) return res[0];
+  }
+
+  return null;
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = schema.parse(await req.json());
 
     console.log('🎨 Compose-image API received:', {
-      baseImageUrl,
-      selectedTraits: typeof selectedTraits === 'object' ? Object.keys(selectedTraits) : selectedTraits,
-      assetId,
-      traitCount: typeof selectedTraits === 'object' ? Object.keys(selectedTraits).length : 0
+      baseImageUrl: body.baseImageUrl,
+      selectedTraits: Array.isArray(body.selectedTraits) ? body.selectedTraits : Object.keys(body.selectedTraits),
+      assetId: body.assetId,
+      traitCount: Array.isArray(body.selectedTraits) ? body.selectedTraits.length : Object.keys(body.selectedTraits).length,
     });
 
-    // Get the base URL from the request headers
-    const protocol = request.headers.get('x-forwarded-proto') || 'http';
-    const host = request.headers.get('host') || 'localhost:3000';
-    const baseUrl = `${protocol}://${host}`;
+    const traitRepo: any = new TraitRepository();
+    const slotRepo: any = getTraitSlotRepository();
 
-    // Get trait slots for proper layering
-    const traitSlotRepo = getTraitSlotRepository();
-    const slots = await traitSlotRepo.findAllOrdered();
-    const domainSlots = slots.map(slot => traitSlotRepo.toDomain(slot));
+    // 1) load slot order
+    const slots = await getAllSlots(slotRepo);
 
-    // Handle both TraitSelection object and array formats
-    let traitSelection: Record<string, Trait>;
-    
-    if (Array.isArray(selectedTraits)) {
-      // Convert traits array to TraitSelection format (legacy support)
-      traitSelection = {};
-      selectedTraits.forEach((trait: Trait) => {
-        traitSelection[trait.slotId] = trait;
-      });
-      console.log('🔄 Converted array to TraitSelection object');
+    // 2) resolve override traits
+    let overrideTraits: TraitSelection = {};
+
+    if (Array.isArray(body.selectedTraits)) {
+      // resolve IDs -> Trait[]
+      const traitIds = body.selectedTraits;
+      const resolved = await resolveTraitsByIds(traitRepo, traitIds);
+
+      overrideTraits = {};
+      for (const t of resolved) {
+        overrideTraits[t.slotId] = t;
+      }
+      console.log('✅ Resolved override traits from IDs:', Object.keys(overrideTraits));
     } else {
-      // Already in TraitSelection format
-      traitSelection = selectedTraits;
+      // already TraitSelection-ish
+      overrideTraits = body.selectedTraits as TraitSelection;
       console.log('✅ Using TraitSelection object directly');
     }
 
     console.log('🎨 Final trait selection for composition:', {
-      slotIds: Object.keys(traitSelection),
-      traits: Object.values(traitSelection).map(t => ({ name: t.name, slotId: t.slotId }))
+      slotIds: Object.keys(overrideTraits),
+      traits: Object.values(overrideTraits).map((t) => ({ name: t.name, slotId: t.slotId })),
     });
 
-    // Compose the image at fixed 1500x1500 dimensions
-    const compositionService = new ImageCompositionService();
-    const result = await compositionService.createFinalComposition(
-      baseImageUrl,
-      traitSelection,
-      domainSlots,
-      baseUrl // Pass the base URL for relative path resolution
-    );
+    // 3) fetch base traits from Helius (STATIC method!)
+    const nft = await HeliusService.getNFTMetadata(body.assetId);
+    if (!nft?.attributes?.length) {
+      throw new Error(`Unable to fetch NFT metadata attributes for assetId=${body.assetId}`);
+    }
 
-    // Convert buffer to base64 for JSON response
-    const imageBase64 = result.imageBuffer.toString('base64');
+    // 4) convert NFT attributes -> baseTraits (slotId -> Trait)
+    const baseTraits: TraitSelection = {};
+
+    for (const attr of nft.attributes) {
+      const traitType = attr?.trait_type;
+      const value = attr?.value;
+
+      if (!traitType || value === undefined || value === null) continue;
+
+      // If the user is overriding this slot, no need to fetch base trait
+      // BUT we still fetch baseTraits for non-overridden slots.
+      const found = await findTraitByTypeAndValue(traitRepo, traitType, String(value));
+      if (found) {
+        baseTraits[found.slotId] = found;
+      }
+    }
+
+    // 5) compose with baseTraits + overrideTraits
+    const composer = new ImageCompositionService();
+
+    const options: any = {
+      width: body.width,
+      height: body.height,
+      format: body.format,
+      quality: body.quality,
+      forceTransparentBase: body.forceTransparentBase ?? true,
+
+      // ✅ this is the key fix your logs asked for
+      baseTraits,
+    };
+
+    const result = await composer.composeImage(body.baseImageUrl, overrideTraits, slots, options);
 
     return NextResponse.json({
       success: true,
-      imageBuffer: imageBase64,
       width: result.width,
       height: result.height,
       format: result.format,
-      size: result.imageBuffer.length
+      imageBase64: result.imageBuffer.toString('base64'),
     });
-
-  } catch (error) {
-    console.error('Error composing image:', error);
+  } catch (e: any) {
+    console.error('❌ compose-image failed:', e);
     return NextResponse.json(
-      { 
-        error: 'Failed to compose image',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
+      { success: false, error: e?.message || 'compose-image failed' },
       { status: 500 }
     );
   }

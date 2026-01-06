@@ -12,11 +12,8 @@ import {
   TOKEN_PROGRAM_ID,
 } from '@solana/spl-token';
 import { 
-  createUmi,
-  generateSigner,
   publicKey,
   some,
-  none,
   Umi,
   signerIdentity,
   createSignerFromKeypair,
@@ -27,8 +24,6 @@ import {
   updateV1,
   fetchAssetV1,
   fetchCollectionV1,
-  AssetV1,
-  UpdateArgs,
   mplCore,
 } from '@metaplex-foundation/mpl-core';
 import { RPC_CONFIG } from '@/lib/constants';
@@ -496,8 +491,7 @@ const uploaded = await irys.uploadMetadata(newMetadata);
   }
 
   async sendAndConfirmTransaction(
-    partiallySignedTransaction: { transaction: Transaction; requiredSignatures: string[]; delegateSignatures: string[] },
-    userSignature: Uint8Array
+    partiallySignedTransaction: { transaction: Transaction; requiredSignatures: string[]; delegateSignatures: string[] }
   ): Promise<TransactionResult> {
     try {
       const { transaction } = partiallySignedTransaction;

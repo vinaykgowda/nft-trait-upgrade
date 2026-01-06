@@ -138,20 +138,23 @@ export class IrysUploadService {
   async fundDeposit(amountSol: number): Promise<FundResult> {
     try {
       const irys = await this.getIrysClient();
-      const atomic = Math.floor(amountSol * 1_000_000_000);
 
-      console.log(`💸 Funding Irys deposit: ${amountSol} SOL (${atomic} atomic)`);
+      // Use SDK conversion to avoid float rounding surprises.
+      // This returns a BigNumber.
+      const atomicBN = irys.utils.toAtomic(amountSol);
+
+      console.log(`💸 Funding Irys deposit: ${amountSol} SOL (${atomicBN.toString()} atomic)`);
       console.log(`- Node: ${irys.url}`);
       console.log(`- Public Key: ${irys.address}`);
 
-      const fundTx = await irys.fund(atomic);
+      const fundTx = await irys.fund(atomicBN);
 
       console.log(`✅ Funded Irys deposit. Tx id: ${fundTx?.id}`);
 
       return {
         success: true,
         txId: fundTx?.id,
-        fundedAtomic: String(fundTx?.quantity ?? atomic)
+        fundedAtomic: String(fundTx?.quantity ?? atomicBN.toString())
       };
     } catch (e: any) {
       return {
@@ -167,50 +170,46 @@ export class IrysUploadService {
    * Ensures you have enough Irys "loaded balance" (deposit on node) to upload <bytes>.
    * This is what prevents your 402 errors.
    *
-   * Irys uses a deposit-based system: fund -> then upload spends from deposit. :contentReference[oaicite:1]{index=1}
+   * IMPORTANT: Use BigNumber operations directly (no BigInt conversion).
    */
   private async ensureIrysDepositForBytes(bytes: number): Promise<void> {
-  const irys = await this.getIrysClient();
+    const irys = await this.getIrysClient();
 
-  const priceBN = await irys.getPrice(bytes);
-  const loadedBN = await irys.getLoadedBalance();
+    const priceBN = await irys.getPrice(bytes);          // BigNumber
+    const loadedBN = await irys.getLoadedBalance();      // BigNumber
 
-  const priceAtomic = BigInt(priceBN.toString());
-  const loadedAtomic = BigInt(loadedBN.toString());
+    console.log(`💰 Irys loaded balance: ${loadedBN.toString()} atomic`);
+    console.log(`💸 Upload price: ${priceBN.toString()} atomic`);
 
-  console.log(`💰 Irys loaded balance: ${loadedAtomic.toString()} atomic`);
-  console.log(`💸 Upload price: ${priceAtomic.toString()} atomic`);
+    // If loaded >= price => ok
+    if (!loadedBN.lt(priceBN)) {
+      console.log(`✅ Deposit sufficient for upload`);
+      return;
+    }
 
-  if (loadedAtomic >= priceAtomic) {
-    console.log(`✅ Deposit sufficient for upload`);
-    return;
+    // buffer to avoid edge failures (BigNumber)
+    const bufferBN = irys.utils.toAtomic(0.00005); // ~50k lamports-ish (atomic)
+    const toFundBN = priceBN.minus(loadedBN).plus(bufferBN);
+
+    console.warn(`⚠️ Insufficient Irys deposit. Auto-funding...`);
+    console.warn(`- Need: ${priceBN.toString()} atomic`);
+    console.warn(`- Have: ${loadedBN.toString()} atomic`);
+    console.warn(`- Funding: ${toFundBN.toString()} atomic`);
+
+    const fundTx = await irys.fund(toFundBN);
+    console.log(`✅ Auto-funded. Fund tx: ${fundTx?.id}`);
+
+    const newLoadedBN = await irys.getLoadedBalance();
+    console.log(`💰 New Irys loaded balance: ${newLoadedBN.toString()} atomic`);
+
+    // If still insufficient, fail loudly
+    if (newLoadedBN.lt(priceBN)) {
+      throw new Error(
+        `Irys deposit still insufficient after funding. ` +
+          `Have=${newLoadedBN.toString()} Need=${priceBN.toString()}`
+      );
+    }
   }
-
-  // buffer to avoid edge failures
-  const bufferAtomic = BigInt(50_000); // ~0.00005 SOL
-  const toFund = (priceAtomic - loadedAtomic) + bufferAtomic;
-
-  console.warn(`⚠️ Insufficient Irys deposit. Auto-funding...`);
-  console.warn(`- Need: ${priceAtomic.toString()} atomic`);
-  console.warn(`- Have: ${loadedAtomic.toString()} atomic`);
-  console.warn(`- Funding: ${toFund.toString()} atomic`);
-
-  const fundTx = await irys.fund(toFund.toString());
-  console.log(`✅ Auto-funded. Fund tx: ${fundTx?.id}`);
-
-  const newLoadedBN = await irys.getLoadedBalance();
-  const newBal = BigInt(newLoadedBN.toString());
-
-  console.log(`💰 New Irys loaded balance: ${newBal.toString()} atomic`);
-
-  if (newBal < priceAtomic) {
-    throw new Error(
-      `Irys deposit still insufficient after funding. ` +
-      `Have=${newBal.toString()} Need=${priceAtomic.toString()}`
-    );
-  }
-}
-
 
   // ---- Irys client init ----
 
@@ -221,7 +220,6 @@ export class IrysUploadService {
     const token = "solana";
 
     // IMPORTANT: this RPC MUST match the network you're funding with.
-    // If this points to devnet while nodeUrl is mainnet, you'll get "balance 0" on Irys.
     const rpcUrl =
       process.env.SOLANA_RPC_URL ||
       "https://api.mainnet-beta.solana.com";
@@ -249,9 +247,9 @@ export class IrysUploadService {
     console.log(`🔗 Connected to Irys: ${irys.url}`);
     console.log(`👛 Irys address: ${irys.address}`);
 
-    // Show both balances to remove confusion:
+    // Show balance (deposit) at init
     const loaded = await irys.getLoadedBalance();
-    console.log(`💰 Irys loaded balance (deposit): ${loaded} atomic`);
+    console.log(`💰 Irys loaded balance (deposit): ${loaded.toString()} atomic`);
 
     this.irysClient = irys;
     return irys;
@@ -261,7 +259,7 @@ export class IrysUploadService {
    * Reads IRYS_PRIVATE_KEY and creates a Solana Keypair.
    * Accepts:
    *  - JSON array string: "[12,34,...]"
-   *  - base58 string (Phantom export / many libs)
+   *  - base58 string
    */
   private loadSolanaKeypairFromEnv(): Keypair {
     const raw = process.env.IRYS_PRIVATE_KEY;

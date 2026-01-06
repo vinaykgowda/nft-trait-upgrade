@@ -79,7 +79,17 @@ export async function POST(request: NextRequest) {
   const apiResponse = createApiResponse(requestId);
 
   try {
-    const body = await validateRequestBody(request, metadataUpdateSchema);
+    // Parse the request body first
+    let requestBody: any;
+    try {
+      requestBody = await request.json();
+      console.log('📥 Raw request body received:', requestBody);
+    } catch (parseError) {
+      console.error('❌ Failed to parse request body:', parseError);
+      return apiResponse.error('Invalid JSON in request body', 400);
+    }
+
+    const body = validateRequestBody(requestBody, metadataUpdateSchema);
 
     console.log('🎨 Metadata update request received');
     console.log('📝 Request body:', {
@@ -154,25 +164,25 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ Metadata JSON uploaded to Irys:', newMetadataUri);
 
-    // 4) Build transaction that updates ONLY the Core asset URI to this metadata URL
+    // 4) Build transaction that updates the Core asset URI to this metadata URL
     const txBuilder = new TransactionBuilder();
 
-    // NOTE:
-    // - We pass newMetadataUri here.
-    // - If your TransactionBuilder is not yet updated to accept it,
-    //   casting to any avoids TS break.
-    const result = await (txBuilder as any).buildMetadataUpdateTransaction({
+    const atomicTxData = {
       walletAddress: body.walletAddress,
       assetId: body.assetId,
+      traitIds: [], // No trait purchase, just metadata update
+      paymentAmount: '0', // No payment for metadata update
+      treasuryWallet: process.env.TREASURY_WALLET_ADDRESS || body.walletAddress,
       newImageUrl: body.newImageUrl,
-      newAttributes: body.newAttributes,
-      newMetadataUri, // ✅ critical new field
-      txSignature: body.txSignature,
-    });
+      newAttributes: body.newAttributes.map(attr => ({
+        trait_type: attr.trait_type,
+        value: String(attr.value)
+      })),
+      newMetadataUri, // Pass the uploaded metadata URI
+    };
 
-    // Your builder likely returns { transaction, requiresDelegateSignature, delegatePublicKey }
-    const tx = result.transaction;
-    const serialized = tx
+    const transaction = await txBuilder.buildAtomicTransaction(atomicTxData);
+    const serialized = transaction
       .serialize({ requireAllSignatures: false })
       .toString('base64');
 
@@ -180,8 +190,8 @@ export async function POST(request: NextRequest) {
       requestId,
       metadataUri: newMetadataUri,
       transaction: serialized,
-      requiresDelegateSignature: result.requiresDelegateSignature ?? true,
-      delegatePublicKey: result.delegatePublicKey ?? undefined,
+      requiresDelegateSignature: true,
+      delegatePublicKey: process.env.SOLANA_DELEGATE_PUBLIC_KEY,
     });
   } catch (error: any) {
     console.error('❌ Update metadata route failed:', error);

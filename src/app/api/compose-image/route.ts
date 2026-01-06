@@ -78,6 +78,24 @@ async function resolveTraitsByIds(traitRepo: any, ids: string[]): Promise<Trait[
 }
 
 async function findTraitByTypeAndValue(traitRepo: any, traitType: string, value: string): Promise<Trait | null> {
+  // Try the new method first
+  if (typeof traitRepo?.findBySlotNameAndTraitName === 'function') {
+    const row = await traitRepo.findBySlotNameAndTraitName(traitType, value);
+    if (row) {
+      // Convert row to domain object
+      return traitRepo.toDomain({
+        ...row,
+        slot_name: traitType,
+        slot_layer_order: null,
+        rarity_name: null,
+        rarity_weight: null,
+        token_symbol: null,
+        token_decimals: null,
+      });
+    }
+  }
+
+  // Fallback to other methods
   const candidates = [
     'findByTraitTypeAndValue',
     'findByTypeAndValue',

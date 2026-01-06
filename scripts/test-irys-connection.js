@@ -22,7 +22,7 @@ async function testIrysConnection() {
     console.log(`🔑 Using keypair: ${keypair.publicKey.toString()}`);
 
     // Initialize Irys service
-    const irysService = new IrysUploadService(keypair);
+    const irysService = new IrysUploadService();
 
     // Check balance
     console.log('💰 Checking Irys balance...');

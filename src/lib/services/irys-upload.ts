@@ -1,10 +1,17 @@
-import { Keypair } from '@solana/web3.js';
-import Irys from '@irys/sdk';
+import Irys from "@irys/sdk";
+import { Keypair } from "@solana/web3.js";
+import bs58 from "bs58";
 
 export interface IrysUploadResult {
   id: string;
   url: string;
   size: number;
+  contentType: string;
+}
+
+export interface NFTMetadataAttribute {
+  trait_type: string;
+  value: string | number;
 }
 
 export interface NFTMetadata {
@@ -14,245 +21,264 @@ export interface NFTMetadata {
   seller_fee_basis_points?: number;
   image: string;
   external_url?: string;
-  attributes: Array<{
-    trait_type: string;
-    value: string | number;
-  }>;
-  properties: {
-    files: Array<{
-      uri: string;
-      type: string;
-    }>;
-    category: string;
-    creators: Array<{
-      address: string;
-      share: number;
-    }>;
+  attributes: NFTMetadataAttribute[];
+  properties?: {
+    files?: { uri: string; type: string }[];
+    category?: string;
+    creators?: { address: string; share: number }[];
   };
 }
 
+export interface FundResult {
+  success: boolean;
+  txId?: string;
+  fundedAtomic?: string;
+  error?: string;
+}
+
 export class IrysUploadService {
-  private irysUrl: string;
-  private keypair: Keypair;
   private irysClient: Irys | null = null;
 
-  constructor(keypair: Keypair, irysUrl?: string) {
-    this.keypair = keypair;
-    // Use devnet Irys for testing, mainnet for production
-    this.irysUrl = irysUrl || process.env.IRYS_NODE_URL || 'https://devnet.irys.xyz';
-  }
-
-  private async getIrysClient(): Promise<Irys> {
-    if (!this.irysClient) {
-      try {
-        this.irysClient = new Irys({
-          url: this.irysUrl,
-          token: 'solana',
-          key: this.keypair.secretKey,
-        });
-        console.log(`🔗 Connected to Irys: ${this.irysUrl}`);
-      } catch (error) {
-        console.error('❌ Failed to initialize Irys client:', error);
-        throw new Error(`Irys initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      }
-    }
-    return this.irysClient;
-  }
+  // ---- Public API ----
 
   /**
-   * Uploads image buffer to Irys
+   * Upload an image buffer to Irys.
+   * Auto-funds Irys deposit if needed (prevents 402 insufficient balance).
    */
   async uploadImage(
     imageBuffer: Buffer,
-    contentType: string = 'image/jpeg'
+    contentType: string,
+    tags: Record<string, string> = {}
   ): Promise<IrysUploadResult> {
+    const irys = await this.getIrysClient();
+
+    const size = imageBuffer.length;
+    await this.ensureIrysDepositForBytes(size);
+
+    const baseTags = [
+      { name: "Content-Type", value: contentType },
+      { name: "App-Name", value: "pepenftupgrade" }
+    ];
+
+    for (const [k, v] of Object.entries(tags)) {
+      baseTags.push({ name: k, value: v });
+    }
+
+    console.log(`📤 Uploading image to Irys (${irys.url})`);
+    console.log(`- Size: ${size} bytes`);
+    console.log(`- Content-Type: ${contentType}`);
+    console.log(`- Public Key: ${irys.address}`);
+
+    const tx = await irys.upload(imageBuffer, { tags: baseTags });
+
+    const id = tx?.id;
+    if (!id) throw new Error("Irys upload failed: missing transaction id");
+
+    const url = `https://gateway.irys.xyz/${id}`;
+
+    console.log(`✅ Image uploaded to Irys: ${url}`);
+
+    return {
+      id,
+      url,
+      size,
+      contentType
+    };
+  }
+
+  /**
+   * Upload metadata JSON to Irys.
+   * Auto-funds Irys deposit if needed.
+   */
+  async uploadMetadata(
+    metadata: NFTMetadata,
+    tags: Record<string, string> = {}
+  ): Promise<IrysUploadResult> {
+    const irys = await this.getIrysClient();
+
+    const json = JSON.stringify(metadata, null, 2);
+    const buf = Buffer.from(json, "utf8");
+
+    await this.ensureIrysDepositForBytes(buf.length);
+
+    const baseTags = [
+      { name: "Content-Type", value: "application/json" },
+      { name: "App-Name", value: "pepenftupgrade" }
+    ];
+
+    for (const [k, v] of Object.entries(tags)) {
+      baseTags.push({ name: k, value: v });
+    }
+
+    console.log(`📤 Uploading metadata to Irys (${irys.url})`);
+    console.log(`- Size: ${buf.length} bytes`);
+    console.log(`- Public Key: ${irys.address}`);
+
+    const tx = await irys.upload(buf, { tags: baseTags });
+
+    const id = tx?.id;
+    if (!id) throw new Error("Irys upload failed: missing transaction id");
+
+    const url = `https://gateway.irys.xyz/${id}`;
+
+    console.log(`✅ Metadata uploaded to Irys: ${url}`);
+
+    return {
+      id,
+      url,
+      size: buf.length,
+      contentType: "application/json"
+    };
+  }
+
+  /**
+   * Optional helper: explicitly fund deposit on Irys node.
+   * amountSol is SOL (e.g. 0.01). Internally converted to lamports (atomic).
+   */
+  async fundDeposit(amountSol: number): Promise<FundResult> {
     try {
-      console.log(`📤 Uploading image to Irys (${this.irysUrl})`);
-      console.log(`   - Size: ${imageBuffer.length} bytes`);
-      console.log(`   - Content-Type: ${contentType}`);
-      console.log(`   - Public Key: ${this.keypair.publicKey.toString()}`);
-
       const irys = await this.getIrysClient();
+      const atomic = Math.floor(amountSol * 1_000_000_000);
 
-      // Check balance before upload
-      const balance = await irys.getLoadedBalance();
-      console.log(`💰 Current Irys balance: ${balance} atomic units`);
+      console.log(`💸 Funding Irys deposit: ${amountSol} SOL (${atomic} atomic)`);
+      console.log(`- Node: ${irys.url}`);
+      console.log(`- Public Key: ${irys.address}`);
 
-      // Estimate cost
-      const price = await irys.getPrice(imageBuffer.length);
-      console.log(`💸 Upload cost estimate: ${price} atomic units`);
+      const fundTx = await irys.fund(atomic);
 
-      // Convert balance and price to BigInt for proper comparison
-      const balanceBigInt = BigInt(balance.toString());
-      const priceBigInt = BigInt(price.toString());
+      console.log(`✅ Funded Irys deposit. Tx id: ${fundTx?.id}`);
 
-      if (balanceBigInt < priceBigInt) {
-        console.warn('⚠️ Insufficient balance for upload, attempting anyway...');
-        console.warn(`⚠️ Balance: ${balanceBigInt.toString()}, Required: ${priceBigInt.toString()}`);
-      } else {
-        console.log(`✅ Sufficient balance for upload: ${balanceBigInt.toString()} >= ${priceBigInt.toString()}`);
+      return {
+        success: true,
+        txId: fundTx?.id,
+        fundedAtomic: String(fundTx?.quantity ?? atomic)
+      };
+    } catch (e: any) {
+      return {
+        success: false,
+        error: e?.message || String(e)
+      };
+    }
+  }
+
+  // ---- Core fix: deposit checks + auto funding ----
+
+  /**
+   * Ensures you have enough Irys "loaded balance" (deposit on node) to upload <bytes>.
+   * This is what prevents your 402 errors.
+   *
+   * Irys uses a deposit-based system: fund -> then upload spends from deposit. :contentReference[oaicite:1]{index=1}
+   */
+  private async ensureIrysDepositForBytes(bytes: number): Promise<void> {
+  const irys = await this.getIrysClient();
+
+  const priceBN = await irys.getPrice(bytes);
+  const loadedBN = await irys.getLoadedBalance();
+
+  const priceAtomic = BigInt(priceBN.toString());
+  const loadedAtomic = BigInt(loadedBN.toString());
+
+  console.log(`💰 Irys loaded balance: ${loadedAtomic.toString()} atomic`);
+  console.log(`💸 Upload price: ${priceAtomic.toString()} atomic`);
+
+  if (loadedAtomic >= priceAtomic) {
+    console.log(`✅ Deposit sufficient for upload`);
+    return;
+  }
+
+  // buffer to avoid edge failures
+  const bufferAtomic = BigInt(50_000); // ~0.00005 SOL
+  const toFund = (priceAtomic - loadedAtomic) + bufferAtomic;
+
+  console.warn(`⚠️ Insufficient Irys deposit. Auto-funding...`);
+  console.warn(`- Need: ${priceAtomic.toString()} atomic`);
+  console.warn(`- Have: ${loadedAtomic.toString()} atomic`);
+  console.warn(`- Funding: ${toFund.toString()} atomic`);
+
+  const fundTx = await irys.fund(toFund.toString());
+  console.log(`✅ Auto-funded. Fund tx: ${fundTx?.id}`);
+
+  const newLoadedBN = await irys.getLoadedBalance();
+  const newBal = BigInt(newLoadedBN.toString());
+
+  console.log(`💰 New Irys loaded balance: ${newBal.toString()} atomic`);
+
+  if (newBal < priceAtomic) {
+    throw new Error(
+      `Irys deposit still insufficient after funding. ` +
+      `Have=${newBal.toString()} Need=${priceAtomic.toString()}`
+    );
+  }
+}
+
+
+  // ---- Irys client init ----
+
+  private async getIrysClient(): Promise<Irys> {
+    if (this.irysClient) return this.irysClient;
+
+    const nodeUrl = process.env.IRYS_NODE_URL || "https://node1.irys.xyz";
+    const token = "solana";
+
+    // IMPORTANT: this RPC MUST match the network you're funding with.
+    // If this points to devnet while nodeUrl is mainnet, you'll get "balance 0" on Irys.
+    const rpcUrl =
+      process.env.SOLANA_RPC_URL ||
+      "https://api.mainnet-beta.solana.com";
+
+    const kp = this.loadSolanaKeypairFromEnv();
+    const pubkey = kp.publicKey.toBase58();
+
+    console.log(`🔑 Initializing Irys client...`);
+    console.log(`- Node URL: ${nodeUrl}`);
+    console.log(`- Token: ${token}`);
+    console.log(`- RPC: ${rpcUrl}`);
+    console.log(`- Wallet pubkey: ${pubkey}`);
+
+    const irys = new Irys({
+      url: nodeUrl,
+      token,
+      key: kp.secretKey, // Uint8Array
+      config: {
+        providerUrl: rpcUrl
       }
+    });
 
-      // Upload the image
-      const response = await irys.upload(imageBuffer, {
-        tags: [
-          { name: 'Content-Type', value: contentType },
-          { name: 'Application', value: 'NFT-Trait-Marketplace' },
-          { name: 'Type', value: 'image' },
-          { name: 'Timestamp', value: Date.now().toString() }
-        ]
-      });
+    await irys.ready();
 
-      const uploadUrl = `${this.irysUrl}/${response.id}`;
+    console.log(`🔗 Connected to Irys: ${irys.url}`);
+    console.log(`👛 Irys address: ${irys.address}`);
 
-      console.log(`✅ Image uploaded to Irys successfully`);
-      console.log(`   - ID: ${response.id}`);
-      console.log(`   - URL: ${uploadUrl}`);
-      
-      return {
-        id: response.id,
-        url: uploadUrl,
-        size: imageBuffer.length
-      };
-    } catch (error) {
-      console.error('❌ Error uploading image to Irys:', error);
-      throw new Error(`Image upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
+    // Show both balances to remove confusion:
+    const loaded = await irys.getLoadedBalance();
+    console.log(`💰 Irys loaded balance (deposit): ${loaded} atomic`);
+
+    this.irysClient = irys;
+    return irys;
   }
 
   /**
-   * Uploads JSON metadata to Irys
+   * Reads IRYS_PRIVATE_KEY and creates a Solana Keypair.
+   * Accepts:
+   *  - JSON array string: "[12,34,...]"
+   *  - base58 string (Phantom export / many libs)
    */
-  async uploadMetadata(metadata: NFTMetadata): Promise<IrysUploadResult> {
-    try {
-      const metadataJson = JSON.stringify(metadata, null, 2);
-      const metadataBuffer = Buffer.from(metadataJson, 'utf-8');
-
-      console.log(`📤 Uploading metadata to Irys`);
-      console.log(`   - Size: ${metadataBuffer.length} bytes`);
-      console.log(`   - Metadata:`, metadata);
-
-      const irys = await this.getIrysClient();
-
-      // Upload the metadata
-      const response = await irys.upload(metadataBuffer, {
-        tags: [
-          { name: 'Content-Type', value: 'application/json' },
-          { name: 'Application', value: 'NFT-Trait-Marketplace' },
-          { name: 'Type', value: 'metadata' },
-          { name: 'Timestamp', value: Date.now().toString() }
-        ]
-      });
-
-      const uploadUrl = `${this.irysUrl}/${response.id}`;
-
-      console.log(`✅ Metadata uploaded to Irys successfully`);
-      console.log(`   - ID: ${response.id}`);
-      console.log(`   - URL: ${uploadUrl}`);
-      
-      return {
-        id: response.id,
-        url: uploadUrl,
-        size: metadataBuffer.length
-      };
-    } catch (error) {
-      console.error('❌ Error uploading metadata to Irys:', error);
-      throw new Error(`Metadata upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  private loadSolanaKeypairFromEnv(): Keypair {
+    const raw = process.env.IRYS_PRIVATE_KEY;
+    if (!raw) {
+      throw new Error("Missing env IRYS_PRIVATE_KEY");
     }
-  }
 
-  /**
-   * Uploads both image and metadata, returning the metadata URI
-   */
-  async uploadImageAndMetadata(
-    imageBuffer: Buffer,
-    metadata: Omit<NFTMetadata, 'image'>,
-    imageContentType: string = 'image/jpeg'
-  ): Promise<{ imageResult: IrysUploadResult; metadataResult: IrysUploadResult }> {
-    try {
-      // Upload image first
-      const imageResult = await this.uploadImage(imageBuffer, imageContentType);
+    const trimmed = raw.trim();
 
-      // Update metadata with image URL
-      const completeMetadata: NFTMetadata = {
-        ...metadata,
-        image: imageResult.url,
-        properties: {
-          ...metadata.properties,
-          files: [
-            {
-              uri: imageResult.url,
-              type: imageContentType
-            },
-            ...metadata.properties.files
-          ],
-          creators: metadata.properties.creators || []
-        }
-      };
-
-      // Upload metadata
-      const metadataResult = await this.uploadMetadata(completeMetadata);
-
-      return {
-        imageResult,
-        metadataResult
-      };
-    } catch (error) {
-      console.error('❌ Error uploading image and metadata:', error);
-      throw error;
+    // JSON array form
+    if (trimmed.startsWith("[")) {
+      const arr = JSON.parse(trimmed) as number[];
+      return Keypair.fromSecretKey(Uint8Array.from(arr));
     }
-  }
 
-  /**
-   * Checks if a resource exists on Irys
-   */
-  async checkResourceExists(id: string): Promise<boolean> {
-    try {
-      console.log(`🔍 Checking if resource exists: ${id}`);
-      const response = await fetch(`${this.irysUrl}/${id}`, { method: 'HEAD' });
-      return response.ok;
-    } catch (error) {
-      console.error('❌ Error checking resource existence:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Gets the balance for the current keypair
-   */
-  async getBalance(): Promise<string> {
-    try {
-      console.log(`💰 Getting balance for: ${this.keypair.publicKey.toString()}`);
-      const irys = await this.getIrysClient();
-      const balance = await irys.getLoadedBalance();
-      return balance.toString();
-    } catch (error) {
-      console.error('❌ Error getting Irys balance:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Fund the Irys account with SOL
-   */
-  async fundAccount(amount: number): Promise<{ success: boolean; txId?: string; error?: string }> {
-    try {
-      console.log(`💸 Funding Irys account with ${amount} SOL`);
-      const irys = await this.getIrysClient();
-      
-      // Convert SOL to lamports (1 SOL = 1,000,000,000 lamports)
-      const lamports = Math.floor(amount * 1_000_000_000);
-      
-      const response = await irys.fund(lamports);
-      
-      console.log(`✅ Account funded successfully: ${response.id}`);
-      return { success: true, txId: response.id };
-    } catch (error) {
-      console.error('❌ Error funding account:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error' 
-      };
-    }
+    // base58 form
+    const decoded = bs58.decode(trimmed);
+    return Keypair.fromSecretKey(decoded);
   }
 }

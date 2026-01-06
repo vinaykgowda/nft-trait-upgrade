@@ -66,8 +66,8 @@ export interface ServiceContainer {
       transactionBuilder: new TransactionBuilder(),
       inventoryManager: new InventoryManager(),
       imageComposition: new ImageCompositionService(),
-      metadata: new MetadataService(new IrysUploadService(mockKeypair)),
-      irysUpload: new IrysUploadService(mockKeypair),
+      metadata: new MetadataService(new IrysUploadService()),
+      irysUpload: new IrysUploadService(),
       coreAssetUpdate: new CoreAssetUpdateService(mockConnection, mockKeypair),
       nftService: createNFTService(),
       

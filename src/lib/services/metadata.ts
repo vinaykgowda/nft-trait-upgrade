@@ -151,16 +151,30 @@ export class MetadataService {
       const metadata = this.buildMetadata(baseAsset, appliedTraits, traitSlots, options);
 
       // Upload image and metadata to Irys - FIXED: Use JPEG format
-      const { imageResult, metadataResult } = await this.irysService.uploadImageAndMetadata(
-        imageBuffer,
-        metadata,
-        'image/jpeg'
-      );
+      const imageResult = await this.irysService.uploadImage(imageBuffer, 'image/jpeg');
+      
+      // Update metadata with image URL
+      const completeMetadata = {
+        ...metadata,
+        image: imageResult.url,
+        properties: {
+          ...(metadata.properties || {}),
+          files: [
+            {
+              uri: imageResult.url,
+              type: 'image/jpeg'
+            },
+            ...(metadata.properties?.files || [])
+          ]
+        }
+      };
+      
+      const metadataResult = await this.irysService.uploadMetadata(completeMetadata);
 
       console.log('✅ Metadata uploaded with proper files array:', {
         imageUri: imageResult.url,
         metadataUri: metadataResult.url,
-        filesPopulated: metadata.properties.files.length > 0
+        filesPopulated: (metadata.properties?.files?.length || 0) > 0
       });
 
       return {
@@ -225,11 +239,25 @@ export class MetadataService {
       });
 
       // Upload new image and metadata - FIXED: Use JPEG format
-      const { imageResult, metadataResult } = await this.irysService.uploadImageAndMetadata(
-        imageBuffer,
-        newMetadata,
-        'image/jpeg'
-      );
+      const imageResult = await this.irysService.uploadImage(imageBuffer, 'image/jpeg');
+      
+      // Update metadata with image URL
+      const completeNewMetadata = {
+        ...newMetadata,
+        image: imageResult.url,
+        properties: {
+          ...(newMetadata.properties || {}),
+          files: [
+            {
+              uri: imageResult.url,
+              type: 'image/jpeg'
+            },
+            ...(newMetadata.properties?.files || [])
+          ]
+        }
+      };
+      
+      const metadataResult = await this.irysService.uploadMetadata(completeNewMetadata);
 
       console.log('✅ Metadata updated with SSRF protection and proper format');
 

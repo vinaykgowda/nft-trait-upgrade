@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
 
     try {
       // Upload to Irys for permanent blockchain storage
-      const irysService = new IrysUploadService(keypair);
+      const irysService = new IrysUploadService();
       const uploadResult = await irysService.uploadImage(buffer, contentType || 'image/jpeg');
 
       console.log(`✅ Image uploaded to Irys (permanent): ${uploadResult.url}`);

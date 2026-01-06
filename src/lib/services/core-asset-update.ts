@@ -13,20 +13,10 @@ import { fromWeb3JsKeypair } from '@metaplex-foundation/umi-web3js-adapters';
 import {
   updateV1,
   fetchAssetV1,
+  fetchCollectionV1,
   AssetV1,
   mplCore,
 } from '@metaplex-foundation/mpl-core';
-
-export interface UpdateOptions {
-  name?: string;
-  description?: string;
-  image?: string;
-  externalUrl?: string;
-  attributes?: Array<{
-    trait_type: string;
-    value: string;
-  }>;
-}
 
 export interface CoreAssetMetadata {
   name: string;
@@ -60,13 +50,11 @@ export class CoreAssetUpdateService {
   constructor(connection: Connection, updateAuthority: Keypair, rpcUrl?: string) {
     this.connection = connection;
     this.updateAuthority = updateAuthority;
-    
-    // Initialize UMI with proper bundle and Core plugin
-    const umiRpcUrl = rpcUrl || connection.rpcEndpoint;
-    this.umi = createUmiBundle(umiRpcUrl)
-      .use(mplCore());
-    
-    // Set the signer identity
+
+    const endpoint = rpcUrl || connection.rpcEndpoint;
+
+    this.umi = createUmiBundle(endpoint).use(mplCore());
+
     const umiKeypair = fromWeb3JsKeypair(updateAuthority);
     const signer = createSignerFromKeypair(this.umi, umiKeypair);
     this.umi = this.umi.use(signerIdentity(signer));
@@ -74,14 +62,59 @@ export class CoreAssetUpdateService {
     console.log('✅ Core asset update service initialized with authority:', updateAuthority.publicKey.toString());
   }
 
+  async verifyUpdateAuthority(assetAddress: string): Promise<boolean> {
+    try {
+      console.log('🔍 Verifying update authority for asset:', assetAddress);
+      
+      const assetPublicKey = publicKey(assetAddress);
+      const asset = await fetchAssetV1(this.umi, assetPublicKey);
+      
+      // Check if the update authority matches
+      let hasAuthority = asset.updateAuthority.type === 'Address' && 
+                          asset.updateAuthority.address === fromWeb3JsKeypair(this.updateAuthority).publicKey;
+
+      // Best-effort: if authority is Collection, check if our key matches the collection update authority.
+      if (!hasAuthority) {
+        const ua: any = (asset as any)?.updateAuthority;
+        if (ua?.type === 'Collection' && ua?.address) {
+          try {
+            const col = await fetchCollectionV1(this.umi, publicKey(ua.address));
+            const colUa: any = (col as any)?.updateAuthority;
+            if (colUa?.type === 'Address' && colUa?.address) {
+              hasAuthority = colUa.address === fromWeb3JsKeypair(this.updateAuthority).publicKey;
+            }
+          } catch (e) {
+            // ignore - delegate plugins may still allow update even if this check can't confirm it
+          }
+        }
+      }
+
+      console.log('🔍 Update authority check:', {
+        assetAuthority: asset.updateAuthority,
+        ourAuthority: fromWeb3JsKeypair(this.updateAuthority).publicKey,
+        hasAuthority
+      });
+      
+      return hasAuthority;
+    } catch (error) {
+      console.error('Failed to verify update authority:', error);
+      return false;
+    }
+  }
+
   /**
-   * Update Core Asset metadata with new traits following Pepe Gods V2 format
+   * ✅ FIXED:
+   * - Builds full off-chain metadata JSON
+   * - Uploads metadata JSON to Irys (if caller didn’t provide newMetadataUri)
+   * - Updates Core asset with newUri = metadataUri (NOT the JSON string)
+   * - Includes collection account when updateAuthority is Collection (fixes Custom:25 MissingCollection)
    */
   async updateAssetWithTraits(
     assetAddress: string,
     newImageUrl: string,
     newAttributes: Array<{ trait_type: string; value: string }>,
-    existingMetadata?: Partial<CoreAssetMetadata>
+    existingMetadata?: Partial<CoreAssetMetadata>,
+    newMetadataUri?: string
   ): Promise<{ signature: string; success: boolean }> {
     try {
       console.log('🎨 Updating Core Asset with traits:', {
@@ -91,7 +124,6 @@ export class CoreAssetUpdateService {
         updateAuthority: this.updateAuthority.publicKey.toString()
       });
 
-      // Convert Web3.js PublicKey to UMI PublicKey
       const assetPublicKey = publicKey(assetAddress);
 
       // Fetch current asset metadata
@@ -107,291 +139,118 @@ export class CoreAssetUpdateService {
         throw new Error(`Failed to fetch asset ${assetAddress}: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
 
-      // Parse existing metadata if URI is available or fetch from Helius
+      // Parse existing metadata if URI is available or use provided base
       let existingData: Partial<CoreAssetMetadata> = {};
-      
-      // First try to fetch from Helius for more complete metadata
-      try {
-        const { HeliusService } = await import('./helius');
-        const heliusMetadata = await HeliusService.getNFTMetadata(assetAddress);
-        if (heliusMetadata) {
-          existingData = heliusMetadata as Partial<CoreAssetMetadata>;
-          console.log('✅ Used Helius metadata as base');
-        }
-      } catch (error) {
-        console.warn('⚠️ Could not fetch metadata from Helius:', error);
-      }
-      
-      // Fallback to URI-based metadata if Helius failed
-      if (!existingData.name && currentAsset.uri) {
+      if (existingMetadata) {
+        existingData = existingMetadata;
+        console.log('✅ Using provided existing metadata');
+      } else if (currentAsset.uri && currentAsset.uri.startsWith('http')) {
         try {
           const response = await fetch(currentAsset.uri);
           if (response.ok) {
-            const uriMetadata = await response.json();
-            existingData = { ...uriMetadata, ...existingData }; // Helius takes precedence
-            console.log('✅ Merged URI metadata with existing data');
+            existingData = await response.json();
+            console.log('✅ Fetched existing metadata from URI');
           }
         } catch (error) {
-          console.warn('⚠️ Could not fetch existing metadata from URI:', error);
+          console.warn('⚠️ Failed to fetch existing metadata from URI:', error);
         }
       }
 
-      // Build new metadata following Pepe Gods V2 format
+      // Build complete attribute set
+      const allTraitSlots = [
+        'Background','Speciality','Fur','Clothes','Hand','Mouth','Mask','Headwear','Eyes','Eyewear'
+      ];
+
+      const existingAttributesMap = new Map<string, any>();
+      if (existingData.attributes) {
+        for (const attr of existingData.attributes) existingAttributesMap.set(attr.trait_type, attr);
+      }
+
+      const newAttributesMap = new Map<string, any>();
+      for (const attr of newAttributes) newAttributesMap.set(attr.trait_type, attr);
+
+      const completeAttributes: Array<{ trait_type: string; value: string | number }> = [];
+      for (const slot of allTraitSlots) {
+        if (newAttributesMap.has(slot)) {
+          completeAttributes.push({ trait_type: slot, value: newAttributesMap.get(slot).value });
+          console.log(`✅ Updated ${slot}: ${newAttributesMap.get(slot).value}`);
+        } else if (existingAttributesMap.has(slot)) {
+          completeAttributes.push({ trait_type: slot, value: existingAttributesMap.get(slot).value });
+          console.log(`📋 Kept ${slot}: ${existingAttributesMap.get(slot).value}`);
+        } else {
+          completeAttributes.push({ trait_type: slot, value: 'Blank' });
+          console.log(`📋 Defaulted ${slot}: Blank`);
+        }
+      }
+
+      const rarityAttr = newAttributesMap.get('Rarity Rank') || existingAttributesMap.get('Rarity Rank');
+      if (rarityAttr) {
+        completeAttributes.push({ trait_type: 'Rarity Rank', value: rarityAttr.value });
+        console.log(`📋 Kept Rarity Rank: ${rarityAttr.value}`);
+      }
+
       const newMetadata: CoreAssetMetadata = {
-        name: existingData.name || currentAsset.name || 'Pepe Gods V2',
+        name: existingData.name || currentAsset.name || 'Unknown',
         description: existingData.description || 'Pepe Gods V2 - Arise from the Ashes, is a refined artistic evolution of the original Pepe Gods collection, created by Pepeverse and supported by a lot of utilities. While the art has been upgraded, the mission remains unchanged - to give back to the community.',
         symbol: existingData.symbol || 'PGV2',
         seller_fee_basis_points: existingData.seller_fee_basis_points || 690,
         image: newImageUrl,
         external_url: existingData.external_url,
-        attributes: await this.buildCompleteAttributeSet(newAttributes, existingData.attributes || []),
+        attributes: completeAttributes,
         properties: {
-          files: [
-            {
-              uri: newImageUrl,
-              type: 'image/jpeg'
-            }
-          ],
+          files: [{ uri: newImageUrl, type: 'image/jpeg' }],
           category: 'image',
-          creators: existingData.properties?.creators || [
-            {
-              address: process.env.NFT_CREATOR_ADDRESS || '6ByScvE5szYLNfVtrgPFEeRvyP5BYuBVUvBSLPxmkNxT',
-              share: 100
-            }
-          ]
+          creators: existingData.properties?.creators || [{
+            address: process.env.NFT_CREATOR_ADDRESS || '6ByScvE5szYLNfVtrgPFEeRvyP5BYuBVUvBSLPxmkNxT',
+            share: 100
+          }]
         }
       };
 
-      console.log('📝 Built new metadata:', {
-        name: newMetadata.name,
-        symbol: newMetadata.symbol,
-        attributeCount: newMetadata.attributes.length,
-        imageUrl: newMetadata.image
-      });
+      // Upload OFF-CHAIN metadata JSON to Irys if no metadata URI is provided.
+      // This avoids putting JSON directly on-chain (tx too large).
+      if (!newMetadataUri) {
+        const { IrysUploadService } = await import('./irys-upload');
+const irys = new IrysUploadService();
+        const uploaded = await irys.uploadMetadata(newMetadata);
+        newMetadataUri = uploaded.url;
+        console.log('✅ Metadata JSON uploaded to Irys:', newMetadataUri);
+      }
 
-      // Create metadata JSON string
-      const metadataJson = JSON.stringify(newMetadata);
+      if (!newMetadataUri.startsWith('http')) {
+        throw new Error(`Invalid newMetadataUri: ${newMetadataUri}`);
+      }
 
-      // Create the update instruction using Metaplex Core
+      // If update authority is a Collection, include the collection account to avoid MissingCollection (Custom:25).
+      let collectionForUpdate: any = undefined;
+      try {
+        const ua: any = (currentAsset as any)?.updateAuthority;
+        if (ua?.type === 'Collection' && ua?.address) {
+          const collectionPk = publicKey(ua.address);
+          collectionForUpdate = await fetchCollectionV1(this.umi, collectionPk);
+          console.log('✅ Using collection for Core update:', collectionPk.toString());
+        }
+      } catch (e) {
+        console.warn('⚠️ Could not fetch collection for update (will try update without it):', e);
+      }
+
+      // ✅ Core update: set uri to metadata URL (NOT JSON)
       const updateBuilder = updateV1(this.umi, {
         asset: assetPublicKey,
+        ...(collectionForUpdate ? { collection: collectionForUpdate } : {}),
         newName: some(newMetadata.name),
-        newUri: some(metadataJson), // For Core assets, metadata can be stored directly
-      });
+        newUri: some(newMetadataUri),
+      } as any);
 
-      // Build and send the transaction
       const result = await updateBuilder.sendAndConfirm(this.umi);
 
       console.log('✅ Core asset updated successfully:', result.signature);
 
-      return {
-        signature: result.signature.toString(),
-        success: true
-      };
+      return { signature: result.signature.toString(), success: true };
 
     } catch (error) {
       console.error('❌ Failed to update Core Asset:', error);
       throw new Error(`Core Asset update failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }
-
-  /**
-   * Batch update multiple assets
-   */
-  async batchUpdateAssets(
-    updates: Array<{
-      assetAddress: string;
-      newImageUrl: string;
-      newAttributes: Array<{ trait_type: string; value: string }>;
-    }>
-  ): Promise<Array<{ signature: string; success: boolean; assetAddress: string }>> {
-    const results = [];
-
-    for (const update of updates) {
-      try {
-        const result = await this.updateAssetWithTraits(
-          update.assetAddress,
-          update.newImageUrl,
-          update.newAttributes
-        );
-        results.push({
-          ...result,
-          assetAddress: update.assetAddress,
-        });
-      } catch (error) {
-        console.error(`Failed to update asset ${update.assetAddress}:`, error);
-        results.push({
-          signature: '',
-          success: false,
-          assetAddress: update.assetAddress,
-        });
-      }
-    }
-
-    return results;
-  }
-
-  /**
-   * Verify asset ownership and update authority
-   */
-  async verifyUpdateAuthority(assetAddress: string): Promise<boolean> {
-    try {
-      console.log('🔍 Verifying update authority for asset:', assetAddress);
-      
-      const assetPublicKey = publicKey(assetAddress);
-      const asset = await fetchAssetV1(this.umi, assetPublicKey);
-      
-      // Check if the update authority matches
-      const hasAuthority = asset.updateAuthority.type === 'Address' && 
-                          asset.updateAuthority.address === fromWeb3JsKeypair(this.updateAuthority).publicKey;
-      
-      console.log('🔍 Update authority check:', {
-        assetAuthority: asset.updateAuthority,
-        ourAuthority: fromWeb3JsKeypair(this.updateAuthority).publicKey,
-        hasAuthority
-      });
-      
-      return hasAuthority;
-    } catch (error) {
-      console.error('Failed to verify update authority:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Build complete attribute set with all trait slots
-   * This ensures every trait slot has an attribute, using "Blank" for empty slots
-   */
-  private async buildCompleteAttributeSet(
-    newAttributes: Array<{ trait_type: string; value: string }>,
-    existingAttributes: Array<{ trait_type: string; value: string | number }> = []
-  ): Promise<Array<{ trait_type: string; value: string | number }>> {
-    try {
-      // Define all possible trait slots in the correct order
-      const allTraitSlots = [
-        'Background',
-        'Speciality', 
-        'Fur',
-        'Clothes',
-        'Hand',
-        'Mouth',
-        'Mask',
-        'Headwear',
-        'Eyes',
-        'Eyewear'
-      ];
-
-      console.log('🏷️ Building complete attribute set:', {
-        newAttributeCount: newAttributes.length,
-        existingAttributeCount: existingAttributes.length,
-        allSlots: allTraitSlots.length
-      });
-
-      // Create a map of existing attributes for easy lookup
-      const existingAttributeMap = new Map<string, string | number>();
-      existingAttributes.forEach(attr => {
-        existingAttributeMap.set(attr.trait_type, attr.value);
-      });
-
-      // Create a map of new attributes (these override existing ones)
-      const newAttributeMap = new Map<string, string>();
-      newAttributes.forEach(attr => {
-        newAttributeMap.set(attr.trait_type, attr.value);
-      });
-
-      // Build complete attribute set
-      const completeAttributes: Array<{ trait_type: string; value: string | number }> = [];
-
-      // Add all trait slots with their values
-      for (const slotName of allTraitSlots) {
-        let value: string | number;
-
-        if (newAttributeMap.has(slotName)) {
-          // Use new value if provided
-          value = newAttributeMap.get(slotName)!;
-          console.log(`✅ Updated ${slotName}: ${value}`);
-        } else if (existingAttributeMap.has(slotName)) {
-          // Keep existing value
-          value = existingAttributeMap.get(slotName)!;
-          console.log(`📋 Kept ${slotName}: ${value}`);
-        } else {
-          // Default to "Blank" for empty slots
-          value = 'Blank';
-          console.log(`⚪ Default ${slotName}: ${value}`);
-        }
-
-        completeAttributes.push({
-          trait_type: slotName,
-          value: value
-        });
-      }
-
-      // Add Rarity Rank (preserve existing or generate new)
-      let rarityRank: number;
-      const existingRarity = existingAttributeMap.get('Rarity Rank');
-      if (existingRarity && typeof existingRarity === 'number') {
-        rarityRank = existingRarity;
-        console.log(`📋 Kept Rarity Rank: ${rarityRank}`);
-      } else {
-        rarityRank = Math.floor(Math.random() * 5000) + 1;
-        console.log(`🎲 Generated Rarity Rank: ${rarityRank}`);
-      }
-
-      completeAttributes.push({
-        trait_type: 'Rarity Rank',
-        value: rarityRank
-      });
-
-      console.log('✅ Complete attribute set built:', {
-        totalAttributes: completeAttributes.length,
-        traitSlots: allTraitSlots.length,
-        hasRarityRank: true
-      });
-
-      return completeAttributes;
-
-    } catch (error) {
-      console.error('❌ Error building complete attribute set:', error);
-      
-      // Fallback: return new attributes with rarity rank
-      const fallbackAttributes = [
-        ...newAttributes,
-        { trait_type: 'Rarity Rank', value: Math.floor(Math.random() * 5000) + 1 }
-      ];
-      
-      console.warn('⚠️ Using fallback attribute set:', fallbackAttributes.length);
-      return fallbackAttributes;
-    }
-  }
-  async getAssetMetadata(assetAddress: string): Promise<CoreAssetMetadata | null> {
-    try {
-      const assetPublicKey = publicKey(assetAddress);
-      const asset = await fetchAssetV1(this.umi, assetPublicKey);
-      
-      if (asset.uri) {
-        const response = await fetch(asset.uri);
-        if (response.ok) {
-          return await response.json();
-        }
-      }
-      
-      // Return basic metadata if URI fetch fails
-      return {
-        name: asset.name || 'Unknown Asset',
-        description: 'Asset description not available',
-        symbol: 'UNKNOWN',
-        seller_fee_basis_points: 0,
-        image: '',
-        attributes: [],
-        properties: {
-          files: [],
-          category: 'image',
-          creators: []
-        }
-      };
-    } catch (error) {
-      console.error('Failed to get asset metadata:', error);
-      return null;
     }
   }
 }

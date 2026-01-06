@@ -40,7 +40,7 @@ export class ImageStorageService {
       const keypair = Keypair.fromSecretKey(new Uint8Array(keypairData));
       
       // Initialize Irys service
-      const irysService = new IrysUploadService(keypair);
+      const irysService = new IrysUploadService();
       
       // Convert File to Buffer
       const arrayBuffer = await file.arrayBuffer();

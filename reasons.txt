@@ -1,0 +1,184 @@
+Got it — you actually have **three separate root causes** here.
+
+---
+
+## 1) Image composition bug (new trait should stack on top of existing traits)
+
+### What’s happening
+
+Your compositor is almost certainly **building layers only from the “newly selected traits”**, not from the **final effective trait set** (existing traits + overrides). So when you change only “Background”, the layer list becomes “Background only”, instead of:
+
+`Background(new) + Speciality(old) + Fur(old) + Clothes(old) + Eyes(old) + Mouth(old) ...`
+
+### Fix (correct approach)
+
+You must build an `effectiveTraitsBySlot` map for **every slot**:
+
+* Start with the NFT’s **current traits** (from Helius or the metadata JSON)
+* Override with the **selected traits** (the “changes”)
+* Then compose layers **in slot order**, skipping only truly “Blank” / missing-image traits
+
+**Pseudo-code you should implement (server-side or in image-composition.ts before layering):**
+
+```ts
+// currentTraitsBySlot: { Background: Trait, Fur: Trait, ... } from NFT metadata
+// selectedTraitsBySlot: partial overrides from UI
+const effectiveTraitsBySlot: Record<string, Trait | null> = {};
+
+for (const slot of slots) {
+  const slotName = slot.name; // "Background", "Fur", ...
+  const override = selectedTraitsBySlot[slotName] ?? null;
+  const existing = currentTraitsBySlot[slotName] ?? null;
+
+  // override wins; otherwise keep existing
+  const finalTrait = override ?? existing;
+
+  // optionally treat "Blank" as null so it doesn't layer
+  effectiveTraitsBySlot[slotName] =
+    finalTrait && finalTrait.name !== "Blank" ? finalTrait : null;
+}
+
+// Now compose strictly using slots order
+const layers = slots
+  .sort((a,b)=>a.order-b.order)
+  .map(slot => effectiveTraitsBySlot[slot.name])
+  .filter(Boolean);
+```
+
+### The key thing to check in your current code
+
+If your `composeImage()` is doing something like:
+
+* “loop selectedTraits and add layers”
+  instead of:
+* “loop slots and pick effective trait per slot”
+
+…that’s the bug.
+
+✅ After you do this, changing **only background** will still produce a fully composed image.
+
+---
+
+## 2) Irys upload “402 Not enough balance” even though wallet has 0.05 SOL
+
+### What’s happening
+
+**SOL balance in the wallet is NOT the same as Irys balance.**
+Irys requires that you **fund your Irys balance** (prepay) before uploads. Your logs show:
+
+* Current Irys balance: **0 atomic units**
+* Upload cost: **63097 atomic units**
+* Then upload fails with **402**
+
+So your uploader is checking Irys balance correctly — but **you never funded the Irys balance**, you only put SOL in the wallet.
+
+### Fix
+
+Before upload:
+
+1. `price = await irys.getPrice(bytes)`
+2. `bal = await irys.getLoadedBalance()`
+3. If `bal < price`, call `await irys.fund(price - bal + buffer)`
+
+Also: you’re using `@irys/sdk`. Irys docs now recommend the newer `@irys/upload` packages for Solana-style setup in many cases. ([docs.irys.xyz][1])
+(You *can* stay on your current SDK, but the “fund before upload” rule still applies.)
+
+### Very important checks
+
+* Make sure you’re on the **same network** for:
+
+  * your SOL RPC (mainnet/devnet)
+  * your Irys node URL (`https://node1.irys.xyz` is mainnet)
+* If your code funds using devnet RPC but uploads to mainnet node, you’ll see exactly what you’re seeing (confirmed tx somewhere, but Irys balance remains 0).
+
+### Why your “confirmed tx” still showed Irys balance 0
+
+Either:
+
+* that tx was **not** an Irys funding transaction, or
+* it was on the **wrong cluster**, or
+* it funded but you’re querying balance for a **different derived wallet / signer** than you think (key parsing bug).
+
+---
+
+## 3) Metadata update transaction failures
+
+You have **two different problems** here:
+
+### (A) “VersionedTransaction too large”
+
+You’re trying to push too much data into one transaction (likely full attributes / plugins payload).
+
+**Fix**
+For Core NFTs, the clean approach is:
+
+* Upload **image** + **metadata JSON** to Irys
+* Update the asset **URI only on-chain** (small)
+* Don’t try to put the whole attributes array into the on-chain update instruction
+
+This drastically reduces tx size and avoids the 1796-byte message blowup.
+
+### (B) `InstructionError: Custom: 25`
+
+For Metaplex Core, **error 25 = “Missing collection”**. ([GitHub][2])
+
+This matches your logs perfectly:
+
+* Your asset authority is `type: 'Collection'`
+* Your update instruction likely **didn’t include the collection account** in the accounts list, OR you’re attempting an update that requires collection context.
+
+**Fix**
+When an asset is collection-authority controlled, the update instruction must be built with the **collection account present** (and signed by the correct authority / delegate).
+
+Also your logs show:
+
+* `hasAuthority: false`
+  So even if you include the collection, you still may not be allowed to update unless:
+* your signer is the **collection update authority**, or
+* you have the correct **delegate/plugin** that grants update permission.
+
+### What you should do structurally (recommended)
+
+**Stop building huge on-chain updates.**
+Do this:
+
+1. Compose final image (fix #1)
+2. Upload image to Irys (fix #2)
+3. Build metadata JSON like your sample
+4. Upload metadata JSON to Irys
+5. On-chain: update **URI only**
+
+That solves:
+
+* tx size
+* attribute mismatch
+* keeps your metadata format exactly as you want
+
+---
+
+## Your sample metadata format
+
+Your example is fine for off-chain JSON. The only thing I’d enforce:
+
+* `image` should be the direct image URL
+* `properties.files[0].uri` should match image URL (with extension)
+* Keep attributes exactly in the array order you want (order doesn’t matter to standard parsers, but it matters to you/UI)
+
+---
+
+## What I need next (so I can point to the exact lines in your repo code)
+
+Since you shared the repo, I can tell you **exactly what to change**, but I need the **actual source files** (not the build output chunks). Right now the uploaded TS files you gave me contain `...` truncations in key places, so I can’t reliably reference the precise buggy loop.
+
+If you want the fastest path:
+
+* upload these exact files from your repo (raw, not minified):
+
+  * `lib/image-composition.ts` (or wherever compose happens)
+  * `lib/irys-upload.ts`
+  * `lib/core-asset-update.ts` / `transaction-builder.ts`
+
+Once you drop those, I’ll reply with **concrete patch-style edits** (what to replace, what to add) for all three issues in one go.
+
+[1]: https://docs.irys.xyz/build/d/sdk/setup "Irys | Installing, Importing & Configuring"
+[2]: https://github.com/metaplex-foundation/mpl-core/blob/main/programs/mpl-core/src/error.rs?utm_source=chatgpt.com "mpl-core/programs/mpl-core/src/error.rs at main"

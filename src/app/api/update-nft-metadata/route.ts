@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Upload metadata to Irys
-    const irysService = new IrysUploadService(updateKeypair);
+    const irysService = new IrysUploadService();
     const metadataResult = await irysService.uploadMetadata(metadata);
 
     // Update Core Asset with new metadata URI

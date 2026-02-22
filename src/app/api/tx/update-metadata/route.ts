@@ -4,6 +4,7 @@ import { TransactionBuilder } from '@/lib/services/transaction-builder';
 import { createApiResponse, getRequestId } from '@/lib/api/response';
 import { validateRequestBody } from '@/lib/api/validation';
 import { HeliusService } from '@/lib/services/helius';
+import { getProjectRepository } from '@/lib/repositories';
 
 const metadataUpdateSchema = z.object({
   walletAddress: z.string().min(32).max(44),
@@ -113,25 +114,31 @@ export async function POST(request: NextRequest) {
       newAttributes: body.newAttributes as any,
     });
 
-    // 2) Build OFF-CHAIN metadata JSON (your expected format)
-    // Helius returns creators with {address, share, verified} - preserve all fields
-    const heliusCreators = (heliusMeta as any)?.properties?.creators || [];
-    const creators = heliusCreators.length > 0 
-      ? heliusCreators 
-      : [
-          {
-            address: process.env.NFT_CREATOR_ADDRESS || '6ByScvE5szYLNfVtrgPFEeRvyP5BYuBVUvBSLPxmkNxT',
-            share: 100,
-          },
-        ];
+    // 2) Load project settings from DB
+    const projectRepo = getProjectRepository();
+    const projects = await projectRepo.findAll();
+    const project = projects[0];
+
+    if (!project) {
+      return apiResponse.error('No project configured in DB', 500);
+    }
+
+    const dbSymbol = project.collection_symbol;
+    const dbFee = project.seller_fee_basis_points;
+    const dbCreatorAddress = project.creator_address || project.treasury_wallet;
+
+    console.log(`📋 Project from DB: symbol=${dbSymbol}, fee=${dbFee}, creator=${dbCreatorAddress}`);
+
+    // Build OFF-CHAIN metadata JSON using DB values (not Helius)
+    const creators = [{ address: dbCreatorAddress, share: 100 }];
 
     const metadataJson = {
-      name: heliusMeta?.name || 'PGV2',
+      name: heliusMeta?.name || `${dbSymbol}`,
       description:
         heliusMeta?.description ||
         'Pepe Gods V2 - Arise from the Ashes, is a refined artistic evolution of the original Pepe Gods collection, created by Pepeverse and supported by a lot of utilities. While the art has been upgraded, the mission remains unchanged - to give back to the community.',
-      symbol: heliusMeta?.symbol || 'PGV2',
-      seller_fee_basis_points: heliusMeta?.seller_fee_basis_points ?? 690,
+      symbol: dbSymbol,
+      seller_fee_basis_points: dbFee,
       image: body.newImageUrl,
       external_url: heliusMeta?.external_url,
       attributes: mergedAttributes,

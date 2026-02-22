@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PinataSDK } from 'pinata';
+import getConfig from 'next/config';
 
 /**
  * POST /api/upload-image
  * 
  * Uploads an image to Pinata IPFS network.
- * Reads PINATA_JWT and PINATA_GATEWAY directly from process.env at request time.
+ * Tries multiple methods to read PINATA_JWT and PINATA_GATEWAY.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -18,18 +19,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Read env vars directly at request time
-    const jwt = process.env.PINATA_JWT;
-    const gateway = process.env.PINATA_GATEWAY;
+    // Method 1: Direct process.env
+    let jwt = process.env.PINATA_JWT;
+    let gateway = process.env.PINATA_GATEWAY;
 
-    // Debug: log all env var keys to see what's available
-    const allEnvKeys = Object.keys(process.env).filter(k => 
-      k.includes('PINATA') || k.includes('TREASURY') || k.includes('DATABASE')
-    );
-    console.log(`🔑 Pinata env check: JWT=${jwt ? 'SET(' + jwt.substring(0, 8) + '...)' : 'MISSING'}, GATEWAY=${gateway || 'MISSING'}`);
-    console.log(`🔑 Relevant env keys found: ${allEnvKeys.join(', ')}`);
-    console.log(`🔑 TREASURY_WALLET=${process.env.TREASURY_WALLET ? 'SET' : 'MISSING'}`);
-    console.log(`🔑 NODE_ENV=${process.env.NODE_ENV}`);
+    // Method 2: Try next/config serverRuntimeConfig
+    if (!jwt || !gateway) {
+      try {
+        const { serverRuntimeConfig } = getConfig() || {};
+        if (serverRuntimeConfig) {
+          jwt = jwt || serverRuntimeConfig.PINATA_JWT;
+          gateway = gateway || serverRuntimeConfig.PINATA_GATEWAY;
+        }
+      } catch (e) {
+        // getConfig may not work in app router
+      }
+    }
+
+    // Debug logging
+    const allPinataKeys = Object.keys(process.env).filter(k => k.includes('PINATA'));
+    console.log(`🔑 ENV DEBUG:`);
+    console.log(`  - PINATA_JWT: ${jwt ? 'SET(' + jwt.substring(0, 10) + '...)' : 'MISSING'}`);
+    console.log(`  - PINATA_GATEWAY: ${gateway || 'MISSING'}`);
+    console.log(`  - All PINATA keys in process.env: [${allPinataKeys.join(', ')}]`);
+    console.log(`  - TREASURY_WALLET: ${process.env.TREASURY_WALLET ? 'SET' : 'MISSING'}`);
+    console.log(`  - DATABASE_URL: ${process.env.DATABASE_URL ? 'SET' : 'MISSING'}`);
+    console.log(`  - NODE_ENV: ${process.env.NODE_ENV}`);
+    console.log(`  - Total env keys: ${Object.keys(process.env).length}`);
 
     if (!jwt || !gateway) {
       return NextResponse.json(
@@ -38,8 +54,11 @@ export async function POST(request: NextRequest) {
           debug: {
             hasJwt: !!jwt,
             hasGateway: !!gateway,
+            pinataKeysFound: allPinataKeys,
+            hasTreasuryWallet: !!process.env.TREASURY_WALLET,
+            hasDatabaseUrl: !!process.env.DATABASE_URL,
             nodeEnv: process.env.NODE_ENV,
-            envKeysWithPinata: allEnvKeys,
+            totalEnvKeys: Object.keys(process.env).length,
           }
         },
         { status: 500 }
@@ -48,7 +67,6 @@ export async function POST(request: NextRequest) {
 
     // Convert base64 back to buffer
     const buffer = Buffer.from(imageBuffer, 'base64');
-
     console.log(`📦 Uploading image to Pinata (${buffer.length} bytes)`);
 
     // Create Pinata SDK instance fresh for each request

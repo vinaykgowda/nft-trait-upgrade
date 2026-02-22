@@ -9,6 +9,13 @@ const nextConfig = {
   // Disable caching to reduce bundle size
   generateBuildId: () => 'build-' + Date.now(),
   
+  // Server-side runtime config - these are ONLY available on the server at runtime
+  // They are NOT inlined during build
+  serverRuntimeConfig: {
+    PINATA_JWT: process.env.PINATA_JWT,
+    PINATA_GATEWAY: process.env.PINATA_GATEWAY,
+  },
+  
   webpack: (config, { isServer }) => {
     config.resolve.fallback = {
       ...config.resolve.fallback,

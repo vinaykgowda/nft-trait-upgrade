@@ -313,6 +313,11 @@ export function EnhancedPurchaseFlow({ selectedNFT, selectedTraits, onSuccess, o
         progress: 90
       });
 
+      // Trigger data refresh now (before showing success) so trait counts update
+      if (onSuccess) {
+        onSuccess(txSignature, newImageUrl);
+      }
+
       // Wait a moment to show the update step
       await new Promise(resolve => setTimeout(resolve, 1500));
 
@@ -321,10 +326,6 @@ export function EnhancedPurchaseFlow({ selectedNFT, selectedTraits, onSuccess, o
         step: 'success', 
         progress: 100 
       });
-
-      if (onSuccess) {
-        onSuccess(txSignature, newImageUrl);
-      }
 
     } catch (error) {
       console.error('Purchase error:', error);

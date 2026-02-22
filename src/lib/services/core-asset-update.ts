@@ -60,35 +60,47 @@ export class CoreAssetUpdateService {
   }
 
   async updateAssetUri(
-  assetAddress: string,
-  metadataUri: string
-): Promise<{ signature: string; success: boolean }> {
-  try {
-    console.log('🧾 Updating Core Asset URI:', { assetAddress, metadataUri });
+      assetAddress: string,
+      metadataUri: string
+    ): Promise<{ signature: string; success: boolean }> {
+      try {
+        console.log('🧾 Updating Core Asset URI:', { assetAddress, metadataUri });
 
-    const assetPublicKey = publicKey(assetAddress);
+        const assetPublicKey = publicKey(assetAddress);
 
-    const builder = updateV1(this.umi, {
-      asset: assetPublicKey,
-      newUri: some(metadataUri),
-    });
+        // Fetch the asset to check if it belongs to a collection
+        const currentAsset = await fetchAssetV1(this.umi, assetPublicKey);
 
-    // ✅ This handles build, sign, send, confirm in one go (and avoids strategy typing issues)
-    const result = await builder.sendAndConfirm(this.umi, {
-      send: { skipPreflight: false },
-      confirm: { commitment: 'confirmed' },
-    });
+        // If update authority is a Collection, include the collection account (fixes MissingCollection / Custom:25)
+        let collectionForUpdate: any = undefined;
+        const ua: any = (currentAsset as any)?.updateAuthority;
+        if (ua?.type === 'Collection' && ua?.address) {
+          const collectionPk = publicKey(ua.address);
+          collectionForUpdate = await fetchCollectionV1(this.umi, collectionPk);
+          console.log('✅ Using collection for Core update:', collectionPk.toString());
+        }
 
-    const sigStr = result.signature.toString();
+        const builder = updateV1(this.umi, {
+          asset: assetPublicKey,
+          ...(collectionForUpdate ? { collection: collectionForUpdate } : {}),
+          newUri: some(metadataUri),
+        } as any);
 
-    console.log('✅ Core Asset URI updated:', sigStr);
+        const result = await builder.sendAndConfirm(this.umi, {
+          send: { skipPreflight: false },
+          confirm: { commitment: 'confirmed' },
+        });
 
-    return { signature: sigStr, success: true };
-  } catch (e: any) {
-    console.error('❌ Core Asset URI update failed:', e);
-    throw new Error(`Core Asset URI update failed: ${e?.message || String(e)}`);
-  }
-}
+        const sigStr = result.signature.toString();
+
+        console.log('✅ Core Asset URI updated:', sigStr);
+
+        return { signature: sigStr, success: true };
+      } catch (e: any) {
+        console.error('❌ Core Asset URI update failed:', e);
+        throw new Error(`Core Asset URI update failed: ${e?.message || String(e)}`);
+      }
+    }
 
   async verifyUpdateAuthority(assetAddress: string): Promise<boolean> {
     try {

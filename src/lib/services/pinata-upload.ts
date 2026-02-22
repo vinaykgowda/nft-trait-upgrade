@@ -17,33 +17,25 @@ export class PinataUploadService {
   /**
    * Initialize Pinata upload service with JWT authentication and gateway configuration.
    * 
-   * @throws {Error} When PINATA_JWT environment variable is missing (only in production)
-   * @throws {Error} When PINATA_GATEWAY environment variable is missing (only in production)
+   * During build time, uses placeholder values. At runtime, requires valid credentials.
    * 
    * Requirements: 2.2, 5.3, 5.4
    */
   constructor() {
     // Validate PINATA_JWT
     const jwt = process.env.PINATA_JWT;
-    if (!jwt) {
-      // Only throw during runtime, not during build
-      if (process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV) {
-        throw new Error('PINATA_JWT environment variable is required');
-      }
-      // Use placeholder for build time
+    const gateway = process.env.PINATA_GATEWAY;
+    
+    // If credentials are missing, use placeholders (for build time)
+    // At runtime, the actual API calls will fail with clear error messages
+    if (!jwt || !gateway) {
       this.jwt = 'build-time-placeholder';
-      this.gateway = 'build-time-placeholder';
-      this.pinata = null as any; // Will fail if actually used during build
-      console.warn('⚠️  Pinata service initialized without credentials (build time)');
+      this.gateway = 'build-time-placeholder.pinata.cloud';
+      this.pinata = null as any; // Will fail if actually used
       return;
     }
+    
     this.jwt = jwt;
-
-    // Validate PINATA_GATEWAY
-    const gateway = process.env.PINATA_GATEWAY;
-    if (!gateway) {
-      throw new Error('PINATA_GATEWAY environment variable is required');
-    }
     this.gateway = gateway;
 
     // Initialize Pinata SDK
@@ -72,6 +64,11 @@ export class PinataUploadService {
     contentType: string,
     metadata?: Record<string, string>
   ): Promise<PinataUploadResult> {
+    // Runtime validation
+    if (!this.pinata || this.jwt === 'build-time-placeholder') {
+      throw new Error('PINATA_JWT and PINATA_GATEWAY environment variables are required. Please configure them in your deployment settings.');
+    }
+    
     const startTime = Date.now();
     
     try {
@@ -150,6 +147,11 @@ export class PinataUploadService {
   async uploadMetadata(
     metadata: NFTMetadata
   ): Promise<PinataUploadResult> {
+    // Runtime validation
+    if (!this.pinata || this.jwt === 'build-time-placeholder') {
+      throw new Error('PINATA_JWT and PINATA_GATEWAY environment variables are required. Please configure them in your deployment settings.');
+    }
+    
     const startTime = Date.now();
     
     try {

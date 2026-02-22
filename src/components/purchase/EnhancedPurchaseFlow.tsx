@@ -323,7 +323,7 @@ export function EnhancedPurchaseFlow({ selectedNFT, selectedTraits, onSuccess, o
       });
 
       if (onSuccess) {
-        onSuccess(txSignature, state.updatedImageUrl);
+        onSuccess(txSignature, newImageUrl);
       }
 
     } catch (error) {

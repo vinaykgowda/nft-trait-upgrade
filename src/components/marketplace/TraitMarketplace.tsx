@@ -190,7 +190,7 @@ export function TraitMarketplace() {
   const handleTweet = () => {
     if (!purchaseSuccess || !selectedNFT) return;
     
-    const tweetText = `Just updated my ${selectedNFT.name} NFT with new traits! 🎨✨ #NFT #Solana`;
+    const tweetText = `Just updated my ${selectedNFT.name} NFT with new traits using Pepeverse Trait Store! 🎨✨ Check it out: https://magiceden.io/item-details/${selectedNFT.address}`;
     const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
     window.open(tweetUrl, '_blank');
   };
@@ -261,16 +261,8 @@ export function TraitMarketplace() {
                   <img
                     src={purchaseSuccess.updatedImageUrl}
                     alt="Updated NFT"
-                    className="w-32 h-32 object-cover rounded-lg mx-auto border-2 border-green-200"
+                    className="w-48 h-48 object-cover rounded-lg mx-auto border-2 border-green-200"
                   />
-                </div>
-
-                {/* Transaction Info */}
-                <div className="mb-6 p-3 bg-gray-50 rounded-lg">
-                  <p className="text-xs text-gray-500 mb-1">Transaction ID:</p>
-                  <p className="text-sm font-mono text-gray-700 break-all">
-                    {purchaseSuccess.txSignature}
-                  </p>
                 </div>
 
                 {/* Action Buttons */}

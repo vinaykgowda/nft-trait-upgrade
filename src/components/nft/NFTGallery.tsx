@@ -15,6 +15,7 @@ export function NFTGallery({ collectionIds, onNFTSelect, selectedNFT }: NFTGalle
   const [nfts, setNfts] = useState<CoreAsset[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     if (connected && publicKey && collectionIds.length > 0) {
@@ -90,16 +91,42 @@ export function NFTGallery({ collectionIds, onNFTSelect, selectedNFT }: NFTGalle
     );
   }
 
+  const filteredNfts = nfts.filter(nft => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      nft.name.toLowerCase().includes(q) ||
+      nft.address.toLowerCase().includes(q)
+    );
+  });
+
   return (
-    <div className="grid grid-cols-3 gap-3">
-      {nfts.map((nft) => (
-        <NFTCard
-          key={nft.address}
-          nft={nft}
-          selected={selectedNFT?.address === nft.address}
-          onClick={() => onNFTSelect?.(nft)}
-        />
-      ))}
+    <div>
+      <input
+        type="text"
+        placeholder="Search NFTs..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        className="w-full mb-3 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+      />
+      {/* Mobile: max 2 rows (2 rows × 3 cols card height) with scroll. Desktop: unconstrained */}
+      <div className="max-h-[340px] lg:max-h-none overflow-y-auto">
+        <div className="grid grid-cols-3 gap-3">
+          {filteredNfts.map((nft) => (
+            <NFTCard
+              key={nft.address}
+              nft={nft}
+              selected={selectedNFT?.address === nft.address}
+              onClick={() => onNFTSelect?.(nft)}
+            />
+          ))}
+          {filteredNfts.length === 0 && (
+            <div className="col-span-3 text-center py-4 text-gray-500 text-sm">
+              No NFTs match &quot;{searchQuery}&quot;
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

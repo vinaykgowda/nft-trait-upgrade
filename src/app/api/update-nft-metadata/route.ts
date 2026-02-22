@@ -94,9 +94,16 @@ export async function POST(request: NextRequest) {
     const projects = await projectRepo.findAll();
     const project = projects[0]; // Use first project
 
-    const creatorAddress = project?.creator_address || process.env.NFT_CREATOR_ADDRESS || updateKeypair.publicKey.toBase58();
-    const collectionSymbol = project?.collection_symbol || process.env.NFT_COLLECTION_SYMBOL || 'PGV2';
-    const sellerFeeBasisPoints = project?.seller_fee_basis_points ?? parseInt(process.env.NFT_SELLER_FEE_BASIS_POINTS || '690', 10);
+    if (!project) {
+      return NextResponse.json(
+        { error: 'No project configured. Set up a project in admin first.' },
+        { status: 500 }
+      );
+    }
+
+    const sellerFeeBasisPoints = project.seller_fee_basis_points;
+    const collectionSymbol = project.collection_symbol;
+    const creatorAddress = project.creator_address || project.treasury_wallet;
 
     console.log(`📋 Project settings from DB: symbol=${collectionSymbol}, fee=${sellerFeeBasisPoints}, creator=${creatorAddress}`);
 

@@ -154,7 +154,7 @@ export async function POST(request: NextRequest) {
     });
 
     // 3) Upload metadata JSON to Pinata IPFS (THIS is the key fix for tx size)
-    const jwt = (process.env.PINATA_JWT || '').trim();
+    const jwt = (process.env.PINATA_JWT || process.env.PINATA_API_TOKEN || '').trim();
     const gateway = (process.env.PINATA_GATEWAY || '').trim();
     
     if (!jwt || !gateway) {

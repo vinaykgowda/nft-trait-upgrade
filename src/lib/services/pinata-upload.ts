@@ -26,7 +26,7 @@ export class PinataUploadService {
    * Get or initialize Pinata SDK instance with runtime environment variables
    */
   private getPinataInstance(): { pinata: PinataSDK; gateway: string } {
-    const jwt = (process.env.PINATA_JWT || '').trim();
+    const jwt = (process.env.PINATA_JWT || process.env.PINATA_API_TOKEN || '').trim();
     const gateway = (process.env.PINATA_GATEWAY || '').trim();
     
     if (!jwt || !gateway) {

@@ -16,20 +16,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Read env vars directly - same way TREASURY_WALLET, DATABASE_URL etc. are read
-    const jwt = (process.env.PINATA_JWT || '').trim();
+    // Read env vars - try both PINATA_JWT and PINATA_API_TOKEN (fallback name)
+    const jwt = (process.env.PINATA_JWT || process.env.PINATA_API_TOKEN || '').trim();
     const gateway = (process.env.PINATA_GATEWAY || '').trim();
 
     // Debug logging
     const allPinataKeys = Object.keys(process.env).filter(k => k.includes('PINATA'));
     console.log(`🔑 ENV DEBUG:`);
-    console.log(`  - PINATA_JWT: ${jwt ? 'SET (length=' + jwt.length + ', starts=' + jwt.substring(0, 8) + '...)' : 'MISSING'}`);
+    console.log(`  - PINATA_JWT: ${process.env.PINATA_JWT ? 'SET' : 'MISSING'}`);
+    console.log(`  - PINATA_API_TOKEN: ${process.env.PINATA_API_TOKEN ? 'SET' : 'MISSING'}`);
+    console.log(`  - jwt resolved: ${jwt ? 'YES (length=' + jwt.length + ')' : 'NO'}`);
     console.log(`  - PINATA_GATEWAY: ${gateway || 'MISSING'}`);
-    console.log(`  - All PINATA keys in process.env: [${allPinataKeys.join(', ')}]`);
-    console.log(`  - TREASURY_WALLET: ${process.env.TREASURY_WALLET ? 'SET' : 'MISSING'}`);
-    console.log(`  - DATABASE_URL: ${process.env.DATABASE_URL ? 'SET' : 'MISSING'}`);
-    console.log(`  - NODE_ENV: ${process.env.NODE_ENV}`);
-    console.log(`  - Total env keys: ${Object.keys(process.env).length}`);
+    console.log(`  - All PINATA keys: [${allPinataKeys.join(', ')}]`);
 
     if (!jwt || !gateway) {
       return NextResponse.json(

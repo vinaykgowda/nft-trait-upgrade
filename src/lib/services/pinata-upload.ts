@@ -17,8 +17,8 @@ export class PinataUploadService {
   /**
    * Initialize Pinata upload service with JWT authentication and gateway configuration.
    * 
-   * @throws {Error} When PINATA_JWT environment variable is missing
-   * @throws {Error} When PINATA_GATEWAY environment variable is missing
+   * @throws {Error} When PINATA_JWT environment variable is missing (only in production)
+   * @throws {Error} When PINATA_GATEWAY environment variable is missing (only in production)
    * 
    * Requirements: 2.2, 5.3, 5.4
    */
@@ -26,7 +26,16 @@ export class PinataUploadService {
     // Validate PINATA_JWT
     const jwt = process.env.PINATA_JWT;
     if (!jwt) {
-      throw new Error('PINATA_JWT environment variable is required');
+      // Only throw during runtime, not during build
+      if (process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV) {
+        throw new Error('PINATA_JWT environment variable is required');
+      }
+      // Use placeholder for build time
+      this.jwt = 'build-time-placeholder';
+      this.gateway = 'build-time-placeholder';
+      this.pinata = null as any; // Will fail if actually used during build
+      console.warn('⚠️  Pinata service initialized without credentials (build time)');
+      return;
     }
     this.jwt = jwt;
 

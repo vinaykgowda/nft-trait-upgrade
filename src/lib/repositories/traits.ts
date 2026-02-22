@@ -226,18 +226,24 @@ export class TraitRepository extends BaseRepository<TraitRow> {
    * Find a trait by slot name (trait_type) and trait name (value)
    * This is used for converting NFT metadata attributes back to trait objects
    */
-  async findBySlotNameAndTraitName(slotName: string, traitName: string, client?: PoolClient): Promise<TraitRow | null> {
-    const queryText = `
-      SELECT t.* FROM ${this.tableName} t
-      LEFT JOIN trait_slots ts ON t.slot_id = ts.id
-      WHERE ts.name = $1 AND t.name = $2 AND t.active = true
-      LIMIT 1
-    `;
-    const queryFn = client ? client.query.bind(client) : query;
-    
-    const result = await queryFn(queryText, [slotName, traitName]);
-    return result.rows[0] || null;
-  }
+  /**
+     * Find a trait by slot name (trait_type) and trait name (value)
+     * This is used for converting NFT metadata attributes back to trait objects.
+     * NOTE: Does NOT filter by active status — original/current traits on an NFT
+     * may be inactive. The active check belongs only on the newly selected trait.
+     */
+    async findBySlotNameAndTraitName(slotName: string, traitName: string, client?: PoolClient): Promise<TraitRow | null> {
+      const queryText = `
+        SELECT t.* FROM ${this.tableName} t
+        LEFT JOIN trait_slots ts ON t.slot_id = ts.id
+        WHERE ts.name = $1 AND t.name = $2
+        LIMIT 1
+      `;
+      const queryFn = client ? client.query.bind(client) : query;
+
+      const result = await queryFn(queryText, [slotName, traitName]);
+      return result.rows[0] || null;
+    }
 
   // Convert database row to domain model
   toDomain(row: TraitWithRelations): Trait {

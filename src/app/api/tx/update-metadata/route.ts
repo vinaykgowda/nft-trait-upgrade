@@ -155,10 +155,7 @@ export async function POST(request: NextRequest) {
 
     // 3) Upload metadata JSON to Pinata IPFS (THIS is the key fix for tx size)
     const pinata = new PinataUploadService();
-    const uploaded = await pinata.uploadMetadata(metadataJson as any, {
-      'X-Request-Id': requestId,
-      'X-Asset-Id': body.assetId,
-    });
+    const uploaded = await pinata.uploadMetadata(metadataJson as any);
 
     const newMetadataUri = uploaded.url; // IPFS gateway URL
 

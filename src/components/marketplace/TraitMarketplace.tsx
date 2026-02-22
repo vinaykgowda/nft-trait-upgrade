@@ -26,6 +26,7 @@ export function TraitMarketplace() {
   const [error, setError] = useState<string>('');
   const [showPurchaseFlow, setShowPurchaseFlow] = useState(false);
   const [expandedSlots, setExpandedSlots] = useState<Record<string, boolean>>({});
+  const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
   const [purchaseSuccess, setPurchaseSuccess] = useState<{
     txSignature: string;
     updatedImageUrl: string;
@@ -79,13 +80,25 @@ export function TraitMarketplace() {
   };
 
   const handleTraitSelect = (slotId: string, trait: Trait | null) => {
+    // Check if the NFT already has this exact trait
+    if (trait && selectedNFT?.attributes) {
+      const slot = slots.find(s => s.id === slotId);
+      const slotName = slot?.name || '';
+      const currentAttribute = selectedNFT.attributes.find(
+        attr => attr.trait_type?.toLowerCase() === slotName.toLowerCase()
+      );
+      if (currentAttribute && currentAttribute.value?.toLowerCase() === trait.name.toLowerCase()) {
+        setDuplicateWarning(`Your NFT already has "${trait.name}" as its ${slotName}. Pick a different one to upgrade!`);
+        setTimeout(() => setDuplicateWarning(null), 4000);
+        return;
+      }
+    }
+    setDuplicateWarning(null);
     setSelectedTraits(prev => {
       const updated = { ...prev };
       if (trait) {
-        // Replace any existing trait for this slot
         updated[slotId] = trait;
       } else {
-        // Remove trait for this slot
         delete updated[slotId];
       }
       return updated;
@@ -317,6 +330,13 @@ export function TraitMarketplace() {
             <h2 className="text-lg font-semibold text-gray-900 mb-4">
               Available Traits
             </h2>
+
+            {duplicateWarning && (
+              <div className="mb-3 px-3 py-2 bg-amber-50 border border-amber-300 rounded-lg text-sm text-amber-800 flex items-center gap-2">
+                <span>⚠️</span>
+                <span>{duplicateWarning}</span>
+              </div>
+            )}
             
             {!selectedNFT ? (
               <div className="flex-1 flex items-center justify-center text-gray-500">

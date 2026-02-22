@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PinataUploadService } from '@/lib/services/pinata-upload';
+import { PinataSDK } from 'pinata';
 
 /**
  * POST /api/upload-image
  * 
  * Uploads an image to Pinata IPFS network.
- * Replaces previous Irys/Vercel Blob implementation.
- * 
- * Requirements: 6.1
+ * Reads PINATA_JWT and PINATA_GATEWAY directly from process.env at request time.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -20,27 +18,52 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Read env vars directly at request time
+    const jwt = process.env.PINATA_JWT;
+    const gateway = process.env.PINATA_GATEWAY;
+
+    console.log(`🔑 Pinata env check: JWT=${jwt ? 'SET(' + jwt.substring(0, 8) + '...)' : 'MISSING'}, GATEWAY=${gateway || 'MISSING'}`);
+
+    if (!jwt || !gateway) {
+      return NextResponse.json(
+        { 
+          error: 'PINATA_JWT and PINATA_GATEWAY environment variables are required',
+          debug: {
+            hasJwt: !!jwt,
+            hasGateway: !!gateway,
+            nodeEnv: process.env.NODE_ENV,
+          }
+        },
+        { status: 500 }
+      );
+    }
+
     // Convert base64 back to buffer
     const buffer = Buffer.from(imageBuffer, 'base64');
 
     console.log(`📦 Uploading image to Pinata (${buffer.length} bytes)`);
 
-    // Use Pinata for all uploads (Requirement 6.1)
-    const pinataService = new PinataUploadService();
-    const uploadResult = await pinataService.uploadImage(
-      buffer,
-      contentType || 'image/webp'
-    );
+    // Create Pinata SDK instance fresh for each request
+    const pinata = new PinataSDK({ pinataJwt: jwt });
 
-    console.log(`✅ Image uploaded to Pinata IPFS: ${uploadResult.url}`);
+    // Create a File object from the buffer
+    const blob = new Blob([new Uint8Array(buffer)], { type: contentType || 'image/webp' });
+    const file = new File([blob], filename || 'image.webp', { type: contentType || 'image/webp' });
 
-    // Return CID as uploadId (Requirement 6.1)
+    // Upload to Pinata
+    const uploadResult = await pinata.upload.public.file(file);
+    const cid = uploadResult.cid;
+    const cleanGateway = gateway.replace(/\/+$/, '');
+    const imageUrl = `https://${cleanGateway}/ipfs/${cid}`;
+
+    console.log(`✅ Image uploaded to Pinata IPFS: ${imageUrl}`);
+
     return NextResponse.json({
       success: true,
-      imageUrl: uploadResult.url,
-      uploadId: uploadResult.cid,  // Return CID instead of Irys ID
-      size: uploadResult.size,
-      storage: 'pinata-ipfs'  // Return 'pinata-ipfs' as storage type
+      imageUrl,
+      uploadId: cid,
+      size: buffer.length,
+      storage: 'pinata-ipfs'
     });
 
   } catch (error) {

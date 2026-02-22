@@ -4,7 +4,7 @@ import { TransactionBuilder } from '@/lib/services/transaction-builder';
 import { createApiResponse, getRequestId } from '@/lib/api/response';
 import { validateRequestBody } from '@/lib/api/validation';
 import { HeliusService } from '@/lib/services/helius';
-import { PinataUploadService } from '@/lib/services/pinata-upload';
+import { PinataSDK } from 'pinata';
 
 const metadataUpdateSchema = z.object({
   walletAddress: z.string().min(32).max(44),
@@ -154,10 +154,17 @@ export async function POST(request: NextRequest) {
     });
 
     // 3) Upload metadata JSON to Pinata IPFS (THIS is the key fix for tx size)
-    const pinata = new PinataUploadService();
-    const uploaded = await pinata.uploadMetadata(metadataJson as any);
-
-    const newMetadataUri = uploaded.url; // IPFS gateway URL
+    const jwt = process.env.PINATA_JWT;
+    const gateway = process.env.PINATA_GATEWAY;
+    
+    if (!jwt || !gateway) {
+      throw new Error('PINATA_JWT and PINATA_GATEWAY environment variables are required');
+    }
+    
+    const pinataSDK = new PinataSDK({ pinataJwt: jwt });
+    const uploadResult = await pinataSDK.upload.public.json(metadataJson);
+    const cleanGateway = gateway.replace(/\/+$/, '');
+    const newMetadataUri = `https://${cleanGateway}/ipfs/${uploadResult.cid}`;
 
     console.log('✅ Metadata JSON uploaded to Pinata IPFS:', newMetadataUri);
 

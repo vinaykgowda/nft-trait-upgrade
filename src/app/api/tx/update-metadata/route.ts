@@ -7,6 +7,7 @@ import { HeliusService } from '@/lib/services/helius';
 import { getProjectRepository } from '@/lib/repositories';
 import { CoreAssetUpdateService } from '@/lib/services/core-asset-update';
 import { PinataUploadService } from '@/lib/services/pinata-upload';
+import { sendTraitSwapToDiscord } from '@/lib/services/discord-webhook';
 
 const metadataUpdateSchema = z.object({
   walletAddress: z.string().min(32).max(44),
@@ -171,6 +172,16 @@ export async function POST(request: NextRequest) {
     const updateResult = await coreService.updateAssetUri(body.assetId, newMetadataUri);
 
     console.log('✅ Core asset URI updated on-chain:', updateResult.signature);
+
+    // Send Discord notification (fire-and-forget, never blocks the response)
+    sendTraitSwapToDiscord({
+      walletAddress: body.walletAddress,
+      nftName: heliusMeta?.name || body.assetId,
+      nftAddress: body.assetId,
+      imageUrl: body.newImageUrl,
+      newTraits: body.newAttributes as { trait_type: string; value: string }[],
+      txSignature: updateResult.signature,
+    }).catch(() => {}); // swallow any errors
 
     return apiResponse.success({
       requestId,

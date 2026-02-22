@@ -50,7 +50,7 @@ export function MarketplacePage() {
     );
   }
 
-  const projectName = 'Pepeverse Trait Store';
+  const projectName = 'PEPEVERSE TRAIT FORGE';
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -58,14 +58,12 @@ export function MarketplacePage() {
       <header className="bg-white shadow-sm border-b">
         <div className="px-2 sm:px-4">
           <div className="flex flex-col items-center py-3 lg:flex-row lg:justify-between lg:py-0 lg:h-16">
-            <div className="flex items-center space-x-4">
-              {project?.logoUrl && (
-                <img
-                  src={project.logoUrl}
-                  alt={projectName}
-                  className="h-8 w-8 rounded"
-                />
-              )}
+            <div className="flex items-center space-x-3">
+              <img
+                src="/trait-forge-logo.png"
+                alt="Pepeverse Trait Forge"
+                className="h-9 w-9 rounded"
+              />
               <h1 className="text-xl font-semibold text-gray-900">
                 {projectName}
               </h1>

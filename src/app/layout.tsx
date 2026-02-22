@@ -3,8 +3,12 @@ import "./globals.css";
 import { AppWalletProvider } from "@/components/wallet/WalletProvider";
 
 export const metadata: Metadata = {
-  title: "NFT Trait Marketplace",
+  title: "Pepeverse Trait Forge",
   description: "Secure trait commerce for Metaplex Core NFTs",
+  icons: {
+    icon: "/trait-forge-logo.png",
+    apple: "/trait-forge-logo.png",
+  },
 };
 
 export default function RootLayout({

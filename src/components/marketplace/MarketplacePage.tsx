@@ -50,14 +50,14 @@ export function MarketplacePage() {
     );
   }
 
-  const projectName = project?.name || 'NFT Trait Marketplace';
+  const projectName = 'Pepeverse Trait Store';
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
+          <div className="flex flex-col items-center py-3 lg:flex-row lg:justify-between lg:py-0 lg:h-16">
             <div className="flex items-center space-x-4">
               {project?.logoUrl && (
                 <img
@@ -71,8 +71,10 @@ export function MarketplacePage() {
               </h1>
             </div>
             
-            <div className="flex items-center space-x-4">
-              <WalletConnectionStatus />
+            <div className="flex items-center space-x-4 mt-2 lg:mt-0">
+              <div className="hidden lg:block">
+                <WalletConnectionStatus />
+              </div>
               <WalletButton />
             </div>
           </div>
@@ -106,7 +108,7 @@ export function MarketplacePage() {
                   </p>
                 )}
                 
-                <p className="text-gray-600 mb-8">
+                <p className="hidden lg:block text-gray-600 mb-8">
                   Connect your Solana wallet to view your NFTs and start customizing them with traits.
                 </p>
                 

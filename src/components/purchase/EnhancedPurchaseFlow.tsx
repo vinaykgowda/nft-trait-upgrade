@@ -229,22 +229,26 @@ export function EnhancedPurchaseFlow({ selectedNFT, selectedTraits, onSuccess, o
       if (composeResponse.ok) {
         const { imageBuffer } = await composeResponse.json();
         
-        // Upload composed image to Irys (permanent storage for NFT metadata)
+        // Upload composed image to Pinata IPFS (permanent storage for NFT metadata)
         const uploadResponse = await fetch('/api/upload-image', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             imageBuffer,
+            contentType: 'image/webp',
             assetId: selectedNFT.address,
-            traits: Object.values(selectedTraits),
-            permanent: true // Use Irys for permanent NFT metadata storage
+            traits: Object.values(selectedTraits)
           })
         });
 
         if (uploadResponse.ok) {
           const { imageUrl } = await uploadResponse.json();
           newImageUrl = imageUrl;
-          console.log('📸 Image uploaded to Irys (permanent):', imageUrl);
+          console.log('📸 Image uploaded to Pinata IPFS:', imageUrl);
+        } else {
+          const errorData = await uploadResponse.json();
+          console.error('❌ Image upload failed:', errorData);
+          throw new Error(`Image upload failed: ${errorData.error || 'Unknown error'}`);
         }
       }
 
@@ -330,9 +334,9 @@ export function EnhancedPurchaseFlow({ selectedNFT, selectedTraits, onSuccess, o
       case 'payment_validating':
         return 'Payment approved.. validating..';
       case 'payment_validated':
-        return 'Payment validated.. uploading image to Irys..';
+        return 'Payment validated.. composing and uploading image to Pinata IPFS..';
       case 'metadata_updating':
-        return 'Image uploaded.. updating metadata..';
+        return 'Image uploaded to Pinata.. updating metadata..';
       case 'metadata_updated':
         return 'Metadata updated..';
       case 'success':
@@ -524,12 +528,12 @@ export function EnhancedPurchaseFlow({ selectedNFT, selectedTraits, onSuccess, o
               )}
               {state.step === 'payment_validated' && (
                 <p className="text-sm text-gray-600">
-                  Payment confirmed! Starting image composition and upload to Irys...
+                  Payment confirmed! Composing image and uploading to Pinata IPFS...
                 </p>
               )}
               {state.step === 'metadata_updating' && (
                 <p className="text-sm text-gray-600">
-                  Uploading composed image to Irys and updating NFT metadata...
+                  Uploading composed image to Pinata IPFS and updating NFT metadata...
                 </p>
               )}
               {state.step === 'metadata_updated' && (

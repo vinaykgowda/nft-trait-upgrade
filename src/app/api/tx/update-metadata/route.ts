@@ -1,27 +1,23 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
-import { TransactionBuilder } from '@/lib/services/transaction-builder';
+import { Connection, Keypair } from '@solana/web3.js';
 import { createApiResponse, getRequestId } from '@/lib/api/response';
 import { validateRequestBody } from '@/lib/api/validation';
 import { HeliusService } from '@/lib/services/helius';
 import { getProjectRepository } from '@/lib/repositories';
+import { CoreAssetUpdateService } from '@/lib/services/core-asset-update';
+import { PinataUploadService } from '@/lib/services/pinata-upload';
 
 const metadataUpdateSchema = z.object({
   walletAddress: z.string().min(32).max(44),
   assetId: z.string().min(32).max(44),
-
-  // This is your newly composed image (can be Irys or Vercel Blob fallback)
   newImageUrl: z.string().url(),
-
-  // Only changed attrs from UI (route will merge with existing into full set)
   newAttributes: z.array(
     z.object({
       trait_type: z.string(),
       value: z.union([z.string(), z.number()]).transform((v) => String(v)),
     })
   ),
-
-  // optional payment signature (you already have this in logs)
   txSignature: z.string().optional(),
 });
 
@@ -32,16 +28,8 @@ function buildCompleteAttributes(params: {
   newAttributes: TraitAttr[];
 }): TraitAttr[] {
   const allTraitSlots = [
-    'Background',
-    'Speciality',
-    'Fur',
-    'Clothes',
-    'Hand',
-    'Mouth',
-    'Mask',
-    'Headwear',
-    'Eyes',
-    'Eyewear',
+    'Background', 'Speciality', 'Fur', 'Clothes', 'Hand',
+    'Mouth', 'Mask', 'Headwear', 'Eyes', 'Eyewear',
   ];
 
   const existingMap = new Map<string, TraitAttr>();
@@ -55,17 +43,14 @@ function buildCompleteAttributes(params: {
   }
 
   const out: TraitAttr[] = [];
-
   for (const slot of allTraitSlots) {
     if (newMap.has(slot)) {
       out.push({ trait_type: slot, value: newMap.get(slot)!.value });
-      continue;
-    }
-    if (existingMap.has(slot)) {
+    } else if (existingMap.has(slot)) {
       out.push({ trait_type: slot, value: existingMap.get(slot)!.value });
-      continue;
+    } else {
+      out.push({ trait_type: slot, value: 'Blank' });
     }
-    out.push({ trait_type: slot, value: 'Blank' });
   }
 
   const rarity = newMap.get('Rarity Rank') || existingMap.get('Rarity Rank');
@@ -74,12 +59,24 @@ function buildCompleteAttributes(params: {
   return out;
 }
 
+function loadUpdateAuthority(): Keypair {
+  // Try UPDATE_AUTHORITY_PRIVATE_KEY first, fall back to SOLANA_DELEGATE_PRIVATE_KEY
+  const raw = process.env.UPDATE_AUTHORITY_PRIVATE_KEY || process.env.SOLANA_DELEGATE_PRIVATE_KEY;
+  if (!raw) throw new Error('UPDATE_AUTHORITY_PRIVATE_KEY or SOLANA_DELEGATE_PRIVATE_KEY not configured');
+
+  const t = raw.trim();
+  if (t.startsWith('[')) {
+    return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(t)));
+  }
+  const bs58 = require('bs58');
+  return Keypair.fromSecretKey(bs58.decode(t));
+}
+
 export async function POST(request: NextRequest) {
   const requestId = getRequestId(request);
   const apiResponse = createApiResponse(requestId);
 
   try {
-    // Parse the request body first
     let requestBody: any;
     try {
       requestBody = await request.json();
@@ -129,9 +126,7 @@ export async function POST(request: NextRequest) {
 
     console.log(`📋 Project from DB: symbol=${dbSymbol}, fee=${dbFee}, creator=${dbCreatorAddress}`);
 
-    // Build OFF-CHAIN metadata JSON using DB values (not Helius)
-    const creators = [{ address: dbCreatorAddress, share: 100 }];
-
+    // Build OFF-CHAIN metadata JSON
     const metadataJson = {
       name: heliusMeta?.name || `${dbSymbol}`,
       description:
@@ -143,14 +138,9 @@ export async function POST(request: NextRequest) {
       external_url: heliusMeta?.external_url,
       attributes: mergedAttributes,
       properties: {
-        files: [
-          {
-            uri: body.newImageUrl,
-            type: 'image/webp',
-          },
-        ],
+        files: [{ uri: body.newImageUrl, type: 'image/webp' }],
         category: 'image',
-        creators,
+        creators: [{ address: dbCreatorAddress, share: 100 }],
       },
     };
 
@@ -160,68 +150,34 @@ export async function POST(request: NextRequest) {
       seller_fee_basis_points: metadataJson.seller_fee_basis_points,
       totalAttributes: metadataJson.attributes.length,
       image: metadataJson.image,
-      creatorsCount: metadataJson.properties.creators.length,
-      creators: metadataJson.properties.creators,
     });
 
-    // 3) Upload metadata JSON to Pinata IPFS using API Key + Secret (no JWT)
-    const apiKey = process.env.PINATA_API_KEY;
-    const apiSecret = process.env.PINATA_API_SECRET;
-    const gateway = (process.env.PINATA_GATEWAY || '').trim();
-    
-    if (!apiKey || !apiSecret || !gateway) {
-      throw new Error(`Pinata config missing: KEY=${apiKey ? 'SET' : 'MISSING'}, SECRET=${apiSecret ? 'SET' : 'MISSING'}, GATEWAY=${gateway ? 'SET' : 'MISSING'}`);
-    }
-    
-    const pinataRes = await fetch('https://api.pinata.cloud/pinning/pinJSONToIPFS', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'pinata_api_key': apiKey,
-        'pinata_secret_api_key': apiSecret,
-      },
-      body: JSON.stringify({ pinataContent: metadataJson }),
-    });
-
-    if (!pinataRes.ok) {
-      const errText = await pinataRes.text();
-      throw new Error(`Pinata metadata upload failed (${pinataRes.status}): ${errText}`);
-    }
-
-    const pinataResult = await pinataRes.json();
-    const cleanGateway = gateway.replace(/\/+$/, '');
-    const newMetadataUri = `https://${cleanGateway}/ipfs/${pinataResult.IpfsHash}`;
+    // 3) Upload metadata JSON to Pinata IPFS
+    const pinata = new PinataUploadService();
+    const pinataResult = await pinata.uploadMetadata(metadataJson as any);
+    const newMetadataUri = pinataResult.url;
 
     console.log('✅ Metadata JSON uploaded to Pinata IPFS:', newMetadataUri);
 
-    // 4) Build transaction that updates the Core asset URI to this metadata URL
-    const txBuilder = new TransactionBuilder();
+    // 4) Server-side: sign and submit the Core asset URI update
+    //    No user wallet signature needed — update authority handles it entirely
+    const rpcUrl = process.env.SOLANA_RPC_URL || process.env.HELIUS_RPC_URL || 'https://api.mainnet-beta.solana.com';
+    const connection = new Connection(rpcUrl, 'confirmed');
+    const updateKeypair = loadUpdateAuthority();
 
-    const atomicTxData = {
-      walletAddress: body.walletAddress,
-      assetId: body.assetId,
-      traitIds: [], // No trait purchase, just metadata update
-      paymentAmount: '0', // No payment for metadata update
-      treasuryWallet: process.env.TREASURY_WALLET_ADDRESS || body.walletAddress,
-      newImageUrl: body.newImageUrl,
-      newAttributes: body.newAttributes.map(attr => ({
-        trait_type: attr.trait_type,
-        value: String(attr.value)
-      })),
-      newMetadataUri, // Pass the uploaded metadata URI
-    };
+    console.log('🔑 Update authority loaded:', updateKeypair.publicKey.toString());
 
-    const transaction = await txBuilder.buildAtomicTransaction(atomicTxData);
-    const serialized = transaction
-      .serialize({ requireAllSignatures: false })
-      .toString('base64');
+    const coreService = new CoreAssetUpdateService(connection, updateKeypair);
+    const updateResult = await coreService.updateAssetUri(body.assetId, newMetadataUri);
+
+    console.log('✅ Core asset URI updated on-chain:', updateResult.signature);
 
     return apiResponse.success({
       requestId,
       metadataUri: newMetadataUri,
-      transaction: serialized,
-      requiresDelegateSignature: true,
-      delegatePublicKey: process.env.SOLANA_DELEGATE_PUBLIC_KEY,
+      metadataCid: pinataResult.cid,
+      signature: updateResult.signature,
+      onChainUpdate: true,
     });
   } catch (error: any) {
     console.error('❌ Update metadata route failed:', error);

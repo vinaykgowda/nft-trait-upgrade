@@ -174,19 +174,27 @@ export async function POST(req: NextRequest) {
     // 4) convert NFT attributes -> baseTraits (slotId -> Trait)
     const baseTraits: TraitSelection = {};
 
+    console.log('🔍 Looking up base traits from NFT attributes:', nft.attributes.map(a => `${a.trait_type}=${a.value}`));
+
     for (const attr of nft.attributes) {
       const traitType = attr?.trait_type;
       const value = attr?.value;
 
       if (!traitType || value === undefined || value === null) continue;
 
-      // If the user is overriding this slot, no need to fetch base trait
-      // BUT we still fetch baseTraits for non-overridden slots.
+      // Skip non-visual attributes
+      if (traitType === 'Rarity Rank' || traitType === 'Special') continue;
+
       const found = await findTraitByTypeAndValue(traitRepo, traitType, String(value));
       if (found) {
         baseTraits[found.slotId] = found;
+        console.log(`  ✅ Found base trait: ${traitType}=${value} -> slotId=${found.slotId}, imageUrl=${found.imageLayerUrl}`);
+      } else {
+        console.log(`  ⚠️ No DB trait found for: ${traitType}=${value} (will be missing from composition)`);
       }
     }
+
+    console.log(`📊 Base traits resolved: ${Object.keys(baseTraits).length} of ${nft.attributes.length} attributes`);
 
     // 5) compose with baseTraits + overrideTraits
     const composer = new ImageCompositionService();

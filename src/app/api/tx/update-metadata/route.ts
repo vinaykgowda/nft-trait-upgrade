@@ -114,6 +114,17 @@ export async function POST(request: NextRequest) {
     });
 
     // 2) Build OFF-CHAIN metadata JSON (your expected format)
+    // Helius returns creators with {address, share, verified} - preserve all fields
+    const heliusCreators = (heliusMeta as any)?.properties?.creators || [];
+    const creators = heliusCreators.length > 0 
+      ? heliusCreators 
+      : [
+          {
+            address: process.env.NFT_CREATOR_ADDRESS || '6ByScvE5szYLNfVtrgPFEeRvyP5BYuBVUvBSLPxmkNxT',
+            share: 100,
+          },
+        ];
+
     const metadataJson = {
       name: heliusMeta?.name || 'PGV2',
       description:
@@ -128,28 +139,22 @@ export async function POST(request: NextRequest) {
         files: [
           {
             uri: body.newImageUrl,
-            type: 'image/webp',  // ✅ Changed from 'image/jpeg' to 'image/webp'
+            type: 'image/webp',
           },
         ],
         category: 'image',
-        creators:
-          (heliusMeta as any)?.properties?.creators ||
-          [
-            {
-              address:
-                process.env.NFT_CREATOR_ADDRESS ||
-                '6ByScvE5szYLNfVtrgPFEeRvyP5BYuBVUvBSLPxmkNxT',
-              share: 100,
-            },
-          ],
+        creators,
       },
     };
 
     console.log('🧾 Built metadata JSON:', {
       name: metadataJson.name,
       symbol: metadataJson.symbol,
+      seller_fee_basis_points: metadataJson.seller_fee_basis_points,
       totalAttributes: metadataJson.attributes.length,
       image: metadataJson.image,
+      creatorsCount: metadataJson.properties.creators.length,
+      creators: metadataJson.properties.creators,
     });
 
     // 3) Upload metadata JSON to Pinata IPFS using API Key + Secret (no JWT)

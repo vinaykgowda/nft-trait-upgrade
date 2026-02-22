@@ -282,7 +282,6 @@ export function EnhancedPurchaseFlow({ selectedNFT, selectedTraits, onSuccess, o
           assetId: selectedNFT.address,
           newImageUrl: newImageUrl,
           newAttributes: Object.values(selectedTraits).map(trait => {
-            // Use the slot mapping to get the proper slot name
             const slotName = slotMapping[trait.slotId] || trait.slotId;
             return {
               trait_type: slotName,
@@ -294,12 +293,47 @@ export function EnhancedPurchaseFlow({ selectedNFT, selectedTraits, onSuccess, o
       });
 
       if (!metadataResponse.ok) {
-        const error = await metadataResponse.json();
-        throw new Error(error.message || 'Failed to update NFT metadata');
+        const errData = await metadataResponse.json();
+        throw new Error(errData.message || 'Failed to build metadata update transaction');
       }
 
       const metadataResult = await metadataResponse.json();
-      console.log('🎨 Metadata updated successfully:', metadataResult.signature);
+      const metadataTxData = metadataResult.data?.transaction || metadataResult.transaction;
+      
+      if (!metadataTxData) {
+        console.error('❌ No metadata transaction data in response:', metadataResult);
+        throw new Error('No metadata update transaction received from server');
+      }
+
+      console.log('📝 Metadata update transaction received, signing...');
+      console.log('📎 Metadata URI:', metadataResult.data?.metadataUri || metadataResult.metadataUri);
+
+      // Sign and submit the metadata update transaction to Solana directly
+      const { Transaction: SolTransaction, Connection } = await import('@solana/web3.js');
+      const metadataTx = SolTransaction.from(Buffer.from(metadataTxData, 'base64'));
+      const signedMetadataTx = await signTransaction(metadataTx);
+
+      // Send directly to Solana RPC
+      const rpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
+      const solConnection = new Connection(rpcUrl, 'confirmed');
+      
+      const rawTx = signedMetadataTx.serialize();
+      const metadataTxSignature = await solConnection.sendRawTransaction(rawTx, {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
+        maxRetries: 3,
+      });
+
+      console.log('📡 Metadata tx sent to Solana:', metadataTxSignature);
+
+      // Wait for confirmation
+      const confirmation = await solConnection.confirmTransaction(metadataTxSignature, 'confirmed');
+      if (confirmation.value?.err) {
+        throw new Error(`Metadata update failed on-chain: ${JSON.stringify(confirmation.value.err)}`);
+      }
+
+      console.log('✅ Metadata updated on-chain! Signature:', metadataTxSignature);
+      console.log('📸 New image URL:', newImageUrl);
 
       // Step 5: Metadata Updated
       updateState({ 

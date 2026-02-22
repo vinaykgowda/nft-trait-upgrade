@@ -221,7 +221,11 @@ export function EnhancedPurchaseFlow({ selectedNFT, selectedTraits, onSuccess, o
         body: JSON.stringify({
           baseImageUrl: selectedNFT.image,
           selectedTraits: selectedTraits, // Send the TraitSelection object, not Object.values()
-          assetId: selectedNFT.address
+          assetId: selectedNFT.address,
+          width: 1500,  // Final NFT image size
+          height: 1500,  // Final NFT image size
+          format: 'webp',
+          quality: 90
         })
       });
 

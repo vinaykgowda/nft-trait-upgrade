@@ -192,10 +192,10 @@ export async function POST(req: NextRequest) {
     const composer = new ImageCompositionService();
 
     const options: any = {
-      width: body.width,
-      height: body.height,
+      width: body.width || 1500,  // Default to 1500 for final NFT images
+      height: body.height || 1500,  // Default to 1500 for final NFT images
       format: body.format || 'webp',  // Default to 'webp' if not specified
-      quality: body.quality,
+      quality: body.quality || 90,  // Default quality 90
       forceTransparentBase: body.forceTransparentBase ?? true,
 
       // ✅ this is the key fix your logs asked for
@@ -209,7 +209,7 @@ export async function POST(req: NextRequest) {
       width: result.width,
       height: result.height,
       format: result.format,
-      imageBase64: result.imageBuffer.toString('base64'),
+      imageBuffer: result.imageBuffer.toString('base64'),  // Changed from imageBase64 to imageBuffer
     });
   } catch (e: any) {
     console.error('❌ compose-image failed:', e);

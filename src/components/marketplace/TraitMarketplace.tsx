@@ -296,14 +296,14 @@ export function TraitMarketplace() {
         )}
 
         {/* 3-Column Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-screen max-h-screen">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:h-screen lg:max-h-screen">
           
           {/* Left Column - NFT Gallery */}
-          <div className="bg-white rounded-lg shadow-sm p-6 overflow-hidden flex flex-col">
+          <div className="bg-white rounded-lg shadow-sm p-6 lg:overflow-hidden flex flex-col">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">
               Your NFTs
             </h2>
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 lg:overflow-y-auto">
               <NFTGallery
                 collectionIds={collectionIds}
                 onNFTSelect={handleNFTSelect}
@@ -313,7 +313,7 @@ export function TraitMarketplace() {
           </div>
 
           {/* Center Column - Available Traits */}
-          <div className="bg-white rounded-lg shadow-sm p-6 overflow-hidden flex flex-col">
+          <div className="bg-white rounded-lg shadow-sm p-6 lg:overflow-hidden flex flex-col">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">
               Available Traits
             </h2>
@@ -330,7 +330,7 @@ export function TraitMarketplace() {
                 )}
               </div>
             ) : (
-              <div className="flex-1 overflow-y-auto space-y-2">
+              <div className="flex-1 lg:overflow-y-auto space-y-2">
                 {slots.map(slot => {
                   const slotTraits = getTraitsForSlot(slot.id);
                   if (slotTraits.length === 0) return null;
@@ -442,7 +442,7 @@ export function TraitMarketplace() {
           </div>
 
           {/* Right Column - Preview & Purchase */}
-          <div className="bg-white rounded-lg shadow-sm p-6 overflow-hidden flex flex-col">
+          <div className="bg-white rounded-lg shadow-sm p-6 flex flex-col">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">
               Preview & Purchase
             </h2>

@@ -14,6 +14,7 @@ const BodySchema = z.object({
   newTraits: z.array(z.any()), // expects items with { slotId, name } at least
   originalTraits: z.array(z.any()).optional(), // expects items like { trait_type, value }
   txSignature: z.string().optional(),
+  dryRun: z.boolean().optional(), // If true, skip on-chain update — just return image URL + metadata
 });
 
 function loadUpdateAuthority(): Keypair {
@@ -47,7 +48,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { assetId, newImageUrl, newTraits, originalTraits, txSignature } = parsed.data;
+    const { assetId, newImageUrl, newTraits, originalTraits, txSignature, dryRun } = parsed.data;
 
     const rpcUrl = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
     const connection = new Connection(rpcUrl, 'confirmed');
@@ -114,6 +115,22 @@ export async function POST(request: NextRequest) {
     // ✅ Upload metadata JSON to Pinata (returns metadata URI)
     const pinata = new PinataUploadService();
     const metadataResult = await pinata.uploadMetadata(metadata);
+
+    // 🛑 Dry-run mode: return everything but DO NOT update on-chain
+    if (dryRun) {
+      console.log('🧪 DRY RUN — skipping on-chain update');
+      return NextResponse.json({
+        success: true,
+        dryRun: true,
+        assetId,
+        newImageUrl,
+        metadataUri: metadataResult.url,
+        metadataCid: metadataResult.cid,
+        metadata,
+        totalAttributes: completeAttributes.length,
+        updatedSlotIds: Array.from(updatedTraitsBySlotId.keys()),
+      });
+    }
 
     // ✅ Update Core asset URI to the Pinata metadata URL (small tx)
     const core = new CoreAssetUpdateService(connection, updateKeypair);

@@ -315,17 +315,35 @@ export class TransactionBuilder {
         throw new Error(`Invalid newMetadataUri: ${newMetadataUri}`);
       }
 
-      // If update authority is a Collection, include collection account (fixes Custom:25 MissingCollection)
+      // Verify delegate has update authority before building the instruction
+      const ua: any = (currentAsset as any)?.updateAuthority;
+      const delegatePubkeyStr = this.delegateKeypair.publicKey.toString();
+
       let collectionForUpdate: any = undefined;
-      try {
-        const ua: any = (currentAsset as any)?.updateAuthority;
-        if (ua?.type === 'Collection' && ua?.address) {
+
+      if (ua?.type === 'Collection' && ua?.address) {
+        // Collection-managed asset — fetch collection and verify delegate is collection update authority
+        try {
           const collectionPk = publicKey(ua.address);
           collectionForUpdate = await fetchCollectionV1(this.umi, collectionPk);
           console.log('✅ Using collection for Core update:', collectionPk.toString());
+        } catch (e) {
+          throw new Error(
+            `Failed to fetch collection ${ua.address} for asset ${assetId.toString()}. ` +
+            `Cannot verify update authority. Cause: ${e instanceof Error ? e.message : String(e)}`
+          );
         }
-      } catch (e) {
-        console.warn('⚠️ Could not fetch collection for update (will try update without it):', e);
+      } else if (ua?.type === 'Address' && ua?.address) {
+        // Direct update authority — verify delegate matches
+        if (ua.address.toString() !== delegatePubkeyStr) {
+          throw new Error(
+            `Delegate authority mismatch: delegate=${delegatePubkeyStr}, ` +
+            `asset updateAuthority=${ua.address.toString()}. Cannot update this asset.`
+          );
+        }
+        console.log('✅ Delegate matches direct update authority');
+      } else {
+        console.warn('⚠️ Unknown update authority type, proceeding with delegate:', ua);
       }
 
       // ✅ Core update instruction (small)
@@ -344,19 +362,12 @@ export class TransactionBuilder {
 
     } catch (error) {
       console.error('❌ Failed to create Core update instruction:', error);
-
-      // Tiny memo fallback (NO JSON)
-      if (!this.delegateKeypair) throw error;
-
-      const memoData = Buffer.from(`CORE_UPDATE_FALLBACK_URI:${newMetadataUri || 'none'}`, 'utf8');
-
-      return new TransactionInstruction({
-        keys: [
-          { pubkey: this.delegateKeypair.publicKey, isSigner: true, isWritable: false },
-        ],
-        programId: new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr'),
-        data: memoData,
-      });
+      // HARD FAIL — never fall back to memo. A memo tx would succeed on-chain
+      // but the NFT URI would remain unchanged, silently corrupting the upgrade.
+      throw new Error(
+        `METADATA_UPDATE_FAILED: Core updateV1 instruction could not be created. ` +
+        `Asset: ${assetId.toString()}. Cause: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 

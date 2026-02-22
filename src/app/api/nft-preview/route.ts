@@ -131,10 +131,25 @@ export async function POST(request: NextRequest) {
         console.log(`🔍 All traits in ${matchingSlot.name} slot:`, existingTraits.map(t => t.name));
 
         const matchingTrait = existingTraits.find(trait => 
-          trait.name.toLowerCase() === traitValue.toLowerCase() ||
-          trait.name.toLowerCase().includes(traitValue.toLowerCase()) ||
-          traitValue.toLowerCase().includes(trait.name.toLowerCase())
-        );
+          trait.name.toLowerCase() === traitValue.toLowerCase()
+        ) || existingTraits.find(trait => {
+          // Only use fuzzy matching if exact match fails
+          // But require the LONGER string to contain the shorter one,
+          // AND the lengths must be similar (within 50% difference) to avoid
+          // "Crown" matching "Special Crown" or "Dragonbone Crown"
+          const traitNameLower = trait.name.toLowerCase();
+          const valueLower = traitValue.toLowerCase();
+          if (traitNameLower === valueLower) return true;
+          
+          // Check if one is a substring of the other
+          const isSubstring = traitNameLower.includes(valueLower) || valueLower.includes(traitNameLower);
+          if (!isSubstring) return false;
+          
+          // Only allow fuzzy match if lengths are very similar (within 3 chars)
+          // This prevents "Crown" from matching "Special Crown" or "Dragonbone Crown"
+          const lengthDiff = Math.abs(traitNameLower.length - valueLower.length);
+          return lengthDiff <= 3;
+        });
 
         if (matchingTrait) {
           completeTraitSelection[matchingSlot.id] = traitRepo.toDomain(matchingTrait);

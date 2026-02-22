@@ -345,9 +345,9 @@ export function EnhancedPurchaseFlow({ selectedNFT, selectedTraits, onSuccess, o
       case 'payment_validating':
         return 'Payment approved.. validating..';
       case 'payment_validated':
-        return 'Payment validated.. composing and uploading image to Pinata IPFS..';
+        return 'Payment validated.. composing and uploading image..';
       case 'metadata_updating':
-        return 'Image uploaded to Pinata.. updating metadata..';
+        return 'Image uploaded.. updating metadata..';
       case 'metadata_updated':
         return 'Metadata updated..';
       case 'success':
@@ -539,12 +539,12 @@ export function EnhancedPurchaseFlow({ selectedNFT, selectedTraits, onSuccess, o
               )}
               {state.step === 'payment_validated' && (
                 <p className="text-sm text-gray-600">
-                  Payment confirmed! Composing image and uploading to Pinata IPFS...
+                  Payment confirmed! Composing image and uploading to IPFS...
                 </p>
               )}
               {state.step === 'metadata_updating' && (
                 <p className="text-sm text-gray-600">
-                  Uploading composed image to Pinata IPFS and updating NFT metadata...
+                  Uploading composed image to IPFS and updating NFT metadata...
                 </p>
               )}
               {state.step === 'metadata_updated' && (

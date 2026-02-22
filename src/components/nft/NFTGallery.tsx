@@ -91,7 +91,7 @@ export function NFTGallery({ collectionIds, onNFTSelect, selectedNFT }: NFTGalle
   }
 
   return (
-    <div className="grid grid-cols-2 gap-4">
+    <div className="grid grid-cols-3 gap-3">
       {nfts.map((nft) => (
         <NFTCard
           key={nft.address}

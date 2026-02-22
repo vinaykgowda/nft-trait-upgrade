@@ -25,6 +25,7 @@ export function TraitMarketplace() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
   const [showPurchaseFlow, setShowPurchaseFlow] = useState(false);
+  const [expandedSlots, setExpandedSlots] = useState<Record<string, boolean>>({});
   const [purchaseSuccess, setPurchaseSuccess] = useState<{
     txSignature: string;
     updatedImageUrl: string;
@@ -172,6 +173,13 @@ export function TraitMarketplace() {
     if (Object.keys(selectedTraits).length > 0 && selectedNFT) {
       setShowPurchaseFlow(true);
     }
+  };
+
+  const toggleSlotExpanded = (slotId: string) => {
+    setExpandedSlots(prev => ({
+      ...prev,
+      [slotId]: !prev[slotId]
+    }));
   };
 
   const handlePurchaseSuccess = (txSignature: string, updatedImageUrl?: string) => {
@@ -322,87 +330,110 @@ export function TraitMarketplace() {
                 )}
               </div>
             ) : (
-              <div className="flex-1 overflow-y-auto space-y-6">
+              <div className="flex-1 overflow-y-auto space-y-2">
                 {slots.map(slot => {
                   const slotTraits = getTraitsForSlot(slot.id);
                   if (slotTraits.length === 0) return null;
+                  const isExpanded = expandedSlots[slot.id] ?? false;
 
                   return (
-                    <div key={slot.id} className="border-b pb-4 last:border-b-0">
-                      <h3 className="font-medium text-gray-900 mb-3">
-                        {slot.name}
-                        {selectedTraits[slot.id] && (
-                          <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
-                            Selected
-                          </span>
-                        )}
-                        {selectedTraits[slot.id] && (
-                          <button
-                            onClick={() => handleTraitSelect(slot.id, null)}
-                            className="ml-2 text-xs bg-red-100 text-red-700 px-2 py-1 rounded hover:bg-red-200"
-                          >
-                            Remove
-                          </button>
-                        )}
-                      </h3>
-                      
-                      <div className="grid grid-cols-2 gap-2">
-                        {slotTraits.map(trait => {
-                          const isSelected = selectedTraits[slot.id]?.id === trait.id;
-                          const isAvailable = !trait.totalSupply || (trait.remainingSupply && trait.remainingSupply > 0);
-                          
-                          return (
-                            <div
-                              key={trait.id}
-                              className={`relative border rounded-lg p-2 cursor-pointer transition-all ${
-                                isSelected
-                                  ? 'border-blue-500 bg-blue-50'
-                                  : isAvailable
-                                  ? 'border-gray-200 hover:border-gray-300'
-                                  : 'border-gray-100 opacity-50 cursor-not-allowed'
-                              }`}
-                              onClick={() => isAvailable && handleTraitSelect(slot.id, trait)}
+                    <div key={slot.id} className="border rounded-lg overflow-hidden">
+                      <button
+                        onClick={() => toggleSlotExpanded(slot.id)}
+                        className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-medium text-gray-900">
+                            {slot.name}
+                          </h3>
+                          <span className="text-xs text-gray-500">({slotTraits.length})</span>
+                          {selectedTraits[slot.id] && (
+                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
+                              {selectedTraits[slot.id].name}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {selectedTraits[slot.id] && (
+                            <span
+                              onClick={(e) => { e.stopPropagation(); handleTraitSelect(slot.id, null); }}
+                              className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded hover:bg-red-200 cursor-pointer"
                             >
-                              <div className="aspect-square mb-2 bg-gray-100 rounded overflow-hidden">
-                                <img
-                                  src={trait.imageLayerUrl}
-                                  alt={trait.name}
-                                  className="w-full h-full object-cover"
-                                />
-                              </div>
+                              Remove
+                            </span>
+                          )}
+                          <svg
+                            className={`w-5 h-5 text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </div>
+                      </button>
+                      
+                      {isExpanded && (
+                        <div className="p-3">
+                          <div className="grid grid-cols-3 gap-2">
+                            {slotTraits.map(trait => {
+                              const isSelected = selectedTraits[slot.id]?.id === trait.id;
+                              const isAvailable = !trait.totalSupply || (trait.remainingSupply && trait.remainingSupply > 0);
                               
-                              <div className="text-xs">
-                                <div className="font-medium text-gray-900 truncate">
-                                  {trait.name}
-                                </div>
-                                <div className="text-gray-500">
-                                  {trait.rarityTier.name}
-                                </div>
-                                <div className="text-gray-900 font-medium">
-                                  {formatDecimalPrice(trait.priceAmount.toString())} {trait.priceToken.symbol}
-                                </div>
-                                {trait.totalSupply && (
-                                  <div className="text-gray-500">
-                                    {trait.remainingSupply}/{trait.totalSupply} left
+                              return (
+                                <div
+                                  key={trait.id}
+                                  className={`relative border rounded-lg p-2 cursor-pointer transition-all ${
+                                    isSelected
+                                      ? 'border-blue-500 bg-blue-50'
+                                      : isAvailable
+                                      ? 'border-gray-200 hover:border-gray-300'
+                                      : 'border-gray-100 opacity-50 cursor-not-allowed'
+                                  }`}
+                                  onClick={() => isAvailable && handleTraitSelect(slot.id, trait)}
+                                >
+                                  <div className="aspect-square mb-2 bg-gray-100 rounded overflow-hidden">
+                                    <img
+                                      src={trait.imageLayerUrl}
+                                      alt={trait.name}
+                                      className="w-full h-full object-cover"
+                                    />
                                   </div>
-                                )}
-                              </div>
-                              
-                              {isSelected && (
-                                <div className="absolute top-1 right-1 bg-blue-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs">
-                                  ✓
+                                  
+                                  <div className="text-xs">
+                                    <div className="font-medium text-gray-900 truncate">
+                                      {trait.name}
+                                    </div>
+                                    <div className="text-gray-500">
+                                      {trait.rarityTier.name}
+                                    </div>
+                                    <div className="text-gray-900 font-medium">
+                                      {formatDecimalPrice(trait.priceAmount.toString())} {trait.priceToken.symbol}
+                                    </div>
+                                    {trait.totalSupply && (
+                                      <div className="text-gray-500">
+                                        {trait.remainingSupply}/{trait.totalSupply} left
+                                      </div>
+                                    )}
+                                  </div>
+                                  
+                                  {isSelected && (
+                                    <div className="absolute top-1 right-1 bg-blue-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs">
+                                      ✓
+                                    </div>
+                                  )}
+                                  
+                                  {!isAvailable && (
+                                    <div className="absolute inset-0 bg-gray-500 bg-opacity-50 rounded-lg flex items-center justify-center">
+                                      <span className="text-white text-xs font-medium">Sold Out</span>
+                                    </div>
+                                  )}
                                 </div>
-                              )}
-                              
-                              {!isAvailable && (
-                                <div className="absolute inset-0 bg-gray-500 bg-opacity-50 rounded-lg flex items-center justify-center">
-                                  <span className="text-white text-xs font-medium">Sold Out</span>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}

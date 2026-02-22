@@ -22,7 +22,14 @@ export async function POST(request: NextRequest) {
     const jwt = process.env.PINATA_JWT;
     const gateway = process.env.PINATA_GATEWAY;
 
+    // Debug: log all env var keys to see what's available
+    const allEnvKeys = Object.keys(process.env).filter(k => 
+      k.includes('PINATA') || k.includes('TREASURY') || k.includes('DATABASE')
+    );
     console.log(`🔑 Pinata env check: JWT=${jwt ? 'SET(' + jwt.substring(0, 8) + '...)' : 'MISSING'}, GATEWAY=${gateway || 'MISSING'}`);
+    console.log(`🔑 Relevant env keys found: ${allEnvKeys.join(', ')}`);
+    console.log(`🔑 TREASURY_WALLET=${process.env.TREASURY_WALLET ? 'SET' : 'MISSING'}`);
+    console.log(`🔑 NODE_ENV=${process.env.NODE_ENV}`);
 
     if (!jwt || !gateway) {
       return NextResponse.json(
@@ -32,6 +39,7 @@ export async function POST(request: NextRequest) {
             hasJwt: !!jwt,
             hasGateway: !!gateway,
             nodeEnv: process.env.NODE_ENV,
+            envKeysWithPinata: allEnvKeys,
           }
         },
         { status: 500 }

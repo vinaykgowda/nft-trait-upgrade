@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
         files: [
           {
             uri: body.newImageUrl,
-            type: 'image/jpeg',
+            type: 'image/webp',  // ✅ Changed from 'image/jpeg' to 'image/webp'
           },
         ],
         category: 'image',

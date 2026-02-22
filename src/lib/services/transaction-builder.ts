@@ -290,7 +290,7 @@ export class TransactionBuilder {
         external_url: existingData.external_url,
         attributes: completeAttributes,
         properties: {
-          files: [{ uri: newImageUrl, type: 'image/jpeg' }],
+          files: [{ uri: newImageUrl, type: 'image/webp' }],
           category: 'image',
           creators: existingData.properties?.creators || [
             {

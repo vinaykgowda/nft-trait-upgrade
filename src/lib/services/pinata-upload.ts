@@ -1,233 +1,95 @@
 import { PinataUploadResult, NFTMetadata } from '@/types';
-import { PinataSDK } from 'pinata';
 
 /**
- * PinataUploadService - Handles uploads to Pinata IPFS network
- * 
- * This service replaces IrysUploadService for decentralized storage via IPFS.
- * It uploads images and metadata to Pinata and returns IPFS CIDs with gateway URLs.
- * 
- * Requirements: 2.1, 2.2, 5.3, 5.4
+ * PinataUploadService - Handles uploads to Pinata IPFS using API Key + Secret.
+ * No JWT needed — uses pinata_api_key and pinata_secret_api_key headers.
  */
 export class PinataUploadService {
-  private pinata: PinataSDK | null = null;
-
-  /**
-   * Initialize Pinata upload service.
-   * Environment variables are read at runtime in each method, not in constructor.
-   * 
-   * Requirements: 2.2, 5.3, 5.4
-   */
-  constructor() {
-    // Don't initialize here - do it lazily in methods to ensure runtime env vars are read
-  }
-
-  /**
-   * Get or initialize Pinata SDK instance with runtime environment variables
-   */
-  private getPinataInstance(): { pinata: PinataSDK; gateway: string } {
-    const jwt = (process.env.PINATA_JWT || process.env.PINATA_API_TOKEN || '').trim();
+  private getCredentials(): { apiKey: string; apiSecret: string; gateway: string } {
+    const apiKey = process.env.PINATA_API_KEY;
+    const apiSecret = process.env.PINATA_API_SECRET;
     const gateway = (process.env.PINATA_GATEWAY || '').trim();
-    
-    if (!jwt || !gateway) {
-      throw new Error('PINATA_JWT and PINATA_GATEWAY environment variables are required. Please configure them in your deployment settings.');
+
+    if (!apiKey || !apiSecret || !gateway) {
+      throw new Error(
+        `Pinata config missing: KEY=${apiKey ? 'SET' : 'MISSING'}, SECRET=${apiSecret ? 'SET' : 'MISSING'}, GATEWAY=${gateway ? 'SET' : 'MISSING'}`
+      );
     }
 
-    // Initialize Pinata SDK if not already done
-    if (!this.pinata) {
-      this.pinata = new PinataSDK({
-        pinataJwt: jwt,
-      });
-
-      // Log service initialization with gateway config (Requirement 12.4)
-      console.log('🔑 Pinata service initialized');
-      console.log(`- Gateway configured: ${gateway}`);
-      console.log(`- Authentication: JWT configured`);
-    }
-
-    return { pinata: this.pinata, gateway };
+    return { apiKey, apiSecret, gateway };
   }
 
-  /**
-   * Upload an image buffer to Pinata IPFS
-   * 
-   * @param imageBuffer - Image data as Buffer
-   * @param contentType - MIME type (e.g., "image/webp")
-   * @param metadata - Optional metadata for the upload
-   * @returns Upload result with CID and gateway URL
-   * 
-   * Requirements: 2.3, 3.1, 3.2, 3.5
-   */
   async uploadImage(
     imageBuffer: Buffer,
     contentType: string,
     metadata?: Record<string, string>
   ): Promise<PinataUploadResult> {
     const startTime = Date.now();
-    
-    try {
-      // Get Pinata instance with runtime environment variables
-      const { pinata, gateway } = this.getPinataInstance();
-      
-      console.log(`📤 Uploading image to Pinata...`);
-      console.log(`- Buffer size: ${imageBuffer.length} bytes`);
-      console.log(`- Content type: ${contentType}`);
+    const { apiKey, apiSecret, gateway } = this.getCredentials();
 
-      // Create a File object from the buffer
-      const blob = new Blob([new Uint8Array(imageBuffer)], { type: contentType });
-      const file = new File([blob], 'image', { type: contentType });
+    console.log(`📤 Uploading image to Pinata (${imageBuffer.length} bytes, ${contentType})`);
 
-      // Upload to Pinata with authentication headers (Requirement 3.5)
-      // The SDK automatically includes JWT authentication
-      // Access the public upload API (public is a property name, not a keyword here)
-      let uploadBuilder = pinata.upload.public.file(file);
-      
-      // Add optional metadata as keyvalues if provided
-      if (metadata) {
-        uploadBuilder = uploadBuilder.keyvalues(metadata);
-      }
-      
-      const uploadResult = await uploadBuilder;
+    const blob = new Blob([new Uint8Array(imageBuffer)], { type: contentType });
+    const formData = new FormData();
+    formData.append('file', blob, 'image');
 
-      const duration = Date.now() - startTime;
-      const cid = uploadResult.cid;
-      const url = this.constructGatewayUrl(cid, gateway);
-
-      // Log success (Requirement 12.2)
-      console.log(`✅ Image uploaded successfully`);
-      console.log(`- CID: ${cid}`);
-      console.log(`- Gateway URL: ${url}`);
-      console.log(`- Upload duration: ${duration}ms`);
-
-      return {
-        cid,
-        url,
-        size: imageBuffer.length,
-        contentType,
-      };
-    } catch (error: any) {
-      const duration = Date.now() - startTime;
-      
-      // Log error (Requirement 12.3)
-      console.error(`❌ Image upload failed after ${duration}ms`);
-      console.error(`- Error type: ${error?.name || 'Unknown'}`);
-      console.error(`- Error message: ${error?.message || 'Unknown error'}`);
-      console.error(`- Buffer size: ${imageBuffer.length} bytes`);
-      console.error(`- Content type: ${contentType}`);
-
-      // Handle specific error types (Requirements 10.1, 10.2, 10.3, 10.5)
-      if (error?.response?.status === 401 || error?.message?.includes('auth')) {
-        throw new Error(`Invalid Pinata JWT credentials: ${error.message}`);
-      }
-      
-      if (error?.response?.status === 429 || error?.message?.includes('rate limit')) {
-        throw new Error(`Pinata rate limit exceeded: ${error.message}`);
-      }
-      
-      if (error?.code === 'ECONNREFUSED' || error?.code === 'ETIMEDOUT' || error?.message?.includes('network')) {
-        throw new Error(`Pinata upload failed: network error - ${error.message}`);
-      }
-
-      // Generic error with original message (Requirement 10.5)
-      throw new Error(`Pinata upload failed: ${error.message || 'Unknown error'}`);
-    }
-  }
-
-  /**
-   * Upload metadata JSON to Pinata IPFS
-   * 
-   * @param metadata - NFT metadata object
-   * @returns Upload result with CID and gateway URL
-   * 
-   * Requirements: 2.4, 4.1, 4.2
-   */
-  async uploadMetadata(
-    metadata: NFTMetadata
-  ): Promise<PinataUploadResult> {
-    const startTime = Date.now();
-    
-    try {
-      // Get Pinata instance with runtime environment variables
-      const { pinata, gateway } = this.getPinataInstance();
-      
-      console.log(`📤 Uploading metadata to Pinata...`);
-      console.log(`- Metadata name: ${metadata.name}`);
-      console.log(`- Attributes count: ${metadata.attributes?.length || 0}`);
-
-      // Serialize metadata to JSON (Requirement 4.1)
-      const metadataJson = JSON.stringify(metadata);
-      const metadataSize = Buffer.byteLength(metadataJson, 'utf8');
-      
-      console.log(`- JSON size: ${metadataSize} bytes`);
-
-      // Upload to Pinata with content-type "application/json" (Requirement 4.2)
-      // The SDK automatically includes JWT authentication
-      const uploadResult = await pinata.upload.public.json(metadata);
-
-      const duration = Date.now() - startTime;
-      const cid = uploadResult.cid;
-      const url = this.constructGatewayUrl(cid, gateway);
-
-      // Log success (Requirement 12.2)
-      console.log(`✅ Metadata uploaded successfully`);
-      console.log(`- CID: ${cid}`);
-      console.log(`- Gateway URL: ${url}`);
-      console.log(`- Upload duration: ${duration}ms`);
-
-      return {
-        cid,
-        url,
-        size: metadataSize,
-        contentType: 'application/json',
-      };
-    } catch (error: any) {
-      const duration = Date.now() - startTime;
-      
-      // Log error (Requirement 12.3)
-      console.error(`❌ Metadata upload failed after ${duration}ms`);
-      console.error(`- Error type: ${error?.name || 'Unknown'}`);
-      console.error(`- Error message: ${error?.message || 'Unknown error'}`);
-      console.error(`- Metadata name: ${metadata.name}`);
-
-      // Handle specific error types (Requirements 10.1, 10.2, 10.3, 10.5)
-      if (error?.response?.status === 401 || error?.message?.includes('auth')) {
-        throw new Error(`Invalid Pinata JWT credentials: ${error.message}`);
-      }
-      
-      if (error?.response?.status === 429 || error?.message?.includes('rate limit')) {
-        throw new Error(`Pinata rate limit exceeded: ${error.message}`);
-      }
-      
-      if (error?.code === 'ECONNREFUSED' || error?.code === 'ETIMEDOUT' || error?.message?.includes('network')) {
-        throw new Error(`Pinata upload failed: network error - ${error.message}`);
-      }
-
-      // Generic error with original message (Requirement 10.5)
-      throw new Error(`Pinata metadata upload failed: ${error.message || 'Unknown error'}`);
-    }
-  }
-
-  /**
-   * Construct gateway URL from CID
-   * 
-   * @param cid - IPFS Content Identifier
-   * @param gateway - Gateway domain
-   * @returns Full HTTPS gateway URL
-   * 
-   * Requirements: 3.4, 4.4, 14.1, 14.2, 14.3
-   */
-  private constructGatewayUrl(cid: string, gateway: string): string {
-    // Validate CID is non-empty (Requirement 14.3)
-    if (!cid || cid.trim().length === 0) {
-      throw new Error('CID must be non-empty');
+    if (metadata) {
+      formData.append('pinataMetadata', JSON.stringify({ keyvalues: metadata }));
     }
 
-    // Remove any trailing slashes from gateway (Requirement 14.2)
+    const res = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
+      method: 'POST',
+      headers: {
+        'pinata_api_key': apiKey,
+        'pinata_secret_api_key': apiSecret,
+      },
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Pinata upload failed (${res.status}): ${errText}`);
+    }
+
+    const result = await res.json();
+    const cid = result.IpfsHash;
     const cleanGateway = gateway.replace(/\/+$/, '');
-
-    // Construct URL as https://{gateway}/ipfs/{cid} (Requirement 14.1)
     const url = `https://${cleanGateway}/ipfs/${cid}`;
 
-    return url;
+    console.log(`✅ Image uploaded: ${url} (${Date.now() - startTime}ms)`);
+
+    return { cid, url, size: imageBuffer.length, contentType };
+  }
+
+  async uploadMetadata(metadata: NFTMetadata): Promise<PinataUploadResult> {
+    const startTime = Date.now();
+    const { apiKey, apiSecret, gateway } = this.getCredentials();
+
+    console.log(`📤 Uploading metadata to Pinata (${metadata.name})`);
+
+    const res = await fetch('https://api.pinata.cloud/pinning/pinJSONToIPFS', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'pinata_api_key': apiKey,
+        'pinata_secret_api_key': apiSecret,
+      },
+      body: JSON.stringify({ pinataContent: metadata }),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Pinata metadata upload failed (${res.status}): ${errText}`);
+    }
+
+    const result = await res.json();
+    const cid = result.IpfsHash;
+    const cleanGateway = gateway.replace(/\/+$/, '');
+    const url = `https://${cleanGateway}/ipfs/${cid}`;
+    const size = Buffer.byteLength(JSON.stringify(metadata), 'utf8');
+
+    console.log(`✅ Metadata uploaded: ${url} (${Date.now() - startTime}ms)`);
+
+    return { cid, url, size, contentType: 'application/json' };
   }
 }

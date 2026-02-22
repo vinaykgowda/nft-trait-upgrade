@@ -4,7 +4,6 @@ import { TransactionBuilder } from '@/lib/services/transaction-builder';
 import { createApiResponse, getRequestId } from '@/lib/api/response';
 import { validateRequestBody } from '@/lib/api/validation';
 import { HeliusService } from '@/lib/services/helius';
-import { PinataSDK } from 'pinata';
 
 const metadataUpdateSchema = z.object({
   walletAddress: z.string().min(32).max(44),
@@ -153,18 +152,33 @@ export async function POST(request: NextRequest) {
       image: metadataJson.image,
     });
 
-    // 3) Upload metadata JSON to Pinata IPFS (THIS is the key fix for tx size)
-    const jwt = (process.env.PINATA_JWT || process.env.PINATA_API_TOKEN || '').trim();
+    // 3) Upload metadata JSON to Pinata IPFS using API Key + Secret (no JWT)
+    const apiKey = process.env.PINATA_API_KEY;
+    const apiSecret = process.env.PINATA_API_SECRET;
     const gateway = (process.env.PINATA_GATEWAY || '').trim();
     
-    if (!jwt || !gateway) {
-      throw new Error('PINATA_JWT and PINATA_GATEWAY environment variables are required');
+    if (!apiKey || !apiSecret || !gateway) {
+      throw new Error(`Pinata config missing: KEY=${apiKey ? 'SET' : 'MISSING'}, SECRET=${apiSecret ? 'SET' : 'MISSING'}, GATEWAY=${gateway ? 'SET' : 'MISSING'}`);
     }
     
-    const pinataSDK = new PinataSDK({ pinataJwt: jwt });
-    const uploadResult = await pinataSDK.upload.public.json(metadataJson);
+    const pinataRes = await fetch('https://api.pinata.cloud/pinning/pinJSONToIPFS', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'pinata_api_key': apiKey,
+        'pinata_secret_api_key': apiSecret,
+      },
+      body: JSON.stringify({ pinataContent: metadataJson }),
+    });
+
+    if (!pinataRes.ok) {
+      const errText = await pinataRes.text();
+      throw new Error(`Pinata metadata upload failed (${pinataRes.status}): ${errText}`);
+    }
+
+    const pinataResult = await pinataRes.json();
     const cleanGateway = gateway.replace(/\/+$/, '');
-    const newMetadataUri = `https://${cleanGateway}/ipfs/${uploadResult.cid}`;
+    const newMetadataUri = `https://${cleanGateway}/ipfs/${pinataResult.IpfsHash}`;
 
     console.log('✅ Metadata JSON uploaded to Pinata IPFS:', newMetadataUri);
 

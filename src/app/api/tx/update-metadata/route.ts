@@ -179,8 +179,8 @@ export async function POST(request: NextRequest) {
       nftName: heliusMeta?.name || body.assetId,
       nftAddress: body.assetId,
       imageUrl: body.newImageUrl,
+      oldImageUrl: heliusMeta?.image || undefined,
       newTraits: body.newAttributes as { trait_type: string; value: string }[],
-      txSignature: updateResult.signature,
     }).catch(() => {}); // swallow any errors
 
     return apiResponse.success({

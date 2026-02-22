@@ -5,7 +5,8 @@
   "build": {
     "env": {
       "NEXT_TELEMETRY_DISABLED": "1",
-      "DISABLE_WEBPACK_CACHE": "true"
+      "DISABLE_WEBPACK_CACHE": "true",
+      "VERCEL_FORCE_NO_BUILD_CACHE": "1"
     }
   },
   "functions": {

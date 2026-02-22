@@ -15,6 +15,9 @@ export interface ProjectRow {
   website_url?: string;
   collection_ids: string[];
   treasury_wallet: string;
+  seller_fee_basis_points: number;
+  collection_symbol: string;
+  creator_address?: string;
   created_at: Date;
   updated_at: Date;
 }
@@ -64,41 +67,47 @@ export class ProjectRepository extends BaseRepository<ProjectRow> {
 
   // Convert database row to domain model
   toDomain(row: ProjectRow): Project {
-    return {
-      id: row.id,
-      name: row.name,
-      description: row.description,
-      logoUrl: row.logo_url,
-      backgroundUrl: row.background_url,
-      discordUrl: row.discord_url,
-      xUrl: row.x_url,
-      magicedenUrl: row.magiceden_url,
-      websiteUrl: row.website_url,
-      collectionIds: row.collection_ids,
-      treasuryWallet: row.treasury_wallet,
-    };
-  }
+      return {
+        id: row.id,
+        name: row.name,
+        description: row.description,
+        logoUrl: row.logo_url,
+        backgroundUrl: row.background_url,
+        discordUrl: row.discord_url,
+        xUrl: row.x_url,
+        magicedenUrl: row.magiceden_url,
+        websiteUrl: row.website_url,
+        collectionIds: row.collection_ids,
+        treasuryWallet: row.treasury_wallet,
+        sellerFeeBasisPoints: row.seller_fee_basis_points,
+        collectionSymbol: row.collection_symbol,
+        creatorAddress: row.creator_address,
+      };
+    }
 
   // Convert domain model to database row
   fromDomain(project: Partial<Project>): Partial<ProjectRow> {
-    const result: Partial<ProjectRow> = {
-      name: project.name,
-      description: project.description,
-      logo_url: project.logoUrl,
-      background_url: project.backgroundUrl,
-      discord_url: project.discordUrl,
-      x_url: project.xUrl,
-      magiceden_url: project.magicedenUrl,
-      website_url: project.websiteUrl,
-      collection_ids: project.collectionIds,
-      treasury_wallet: project.treasuryWallet,
-    };
+      const result: Partial<ProjectRow> = {
+        name: project.name,
+        description: project.description,
+        logo_url: project.logoUrl,
+        background_url: project.backgroundUrl,
+        discord_url: project.discordUrl,
+        x_url: project.xUrl,
+        magiceden_url: project.magicedenUrl,
+        website_url: project.websiteUrl,
+        collection_ids: project.collectionIds,
+        treasury_wallet: project.treasuryWallet,
+        seller_fee_basis_points: project.sellerFeeBasisPoints,
+        collection_symbol: project.collectionSymbol,
+        creator_address: project.creatorAddress,
+      };
 
-    // Only include id if it's defined (for create operations)
-    if (project.id !== undefined) {
-      result.id = project.id;
+      // Only include id if it's defined (for create operations)
+      if (project.id !== undefined) {
+        result.id = project.id;
+      }
+
+      return result;
     }
-
-    return result;
-  }
 }

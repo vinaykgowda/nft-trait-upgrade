@@ -13,6 +13,9 @@ CREATE TABLE projects (
     website_url VARCHAR(500),
     collection_ids TEXT[] NOT NULL DEFAULT '{}', -- Core collection addresses
     treasury_wallet VARCHAR(44) NOT NULL,
+    seller_fee_basis_points INTEGER NOT NULL DEFAULT 690,
+    collection_symbol VARCHAR(20) NOT NULL DEFAULT 'PGV2',
+    creator_address VARCHAR(44),
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
 );

@@ -16,6 +16,9 @@ const projectSchema = z.object({
   websiteUrl: z.union([z.string().url(), z.literal(''), z.undefined()]).optional(),
   collectionIds: z.array(z.string().min(32).max(44)).min(1, 'At least one collection ID is required'),
   treasuryWallet: z.string().min(32).max(44, 'Invalid treasury wallet address'),
+  sellerFeeBasisPoints: z.number().int().min(0).max(10000).optional().default(690),
+  collectionSymbol: z.string().min(1).max(20).optional().default('PGV2'),
+  creatorAddress: z.string().min(32).max(44).optional(),
 });
 
 const updateProjectSchema = projectSchema.partial();

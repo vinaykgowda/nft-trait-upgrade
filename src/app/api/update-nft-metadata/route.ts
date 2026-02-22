@@ -6,7 +6,7 @@ import bs58 from 'bs58';
 import { CoreAssetUpdateService } from '@/lib/services/core-asset-update';
 import { PinataUploadService } from '@/lib/services/pinata-upload';
 import { NFTMetadata } from '@/types';
-import { getTraitSlotRepository } from '@/lib/repositories';
+import { getTraitSlotRepository, getProjectRepository } from '@/lib/repositories';
 
 const BodySchema = z.object({
   assetId: z.string().min(32),
@@ -89,14 +89,20 @@ export async function POST(request: NextRequest) {
       completeAttributes.push({ trait_type: slotName, value: String(val) });
     }
 
-    const creatorAddress =
-      process.env.NFT_CREATOR_ADDRESS || updateKeypair.publicKey.toBase58();
-    const collectionSymbol = process.env.NFT_COLLECTION_SYMBOL || 'PGV2';
-    const sellerFeeBasisPoints = parseInt(process.env.NFT_SELLER_FEE_BASIS_POINTS || '690', 10);
+    // Load project settings from DB (first project — single-project setup)
+    const projectRepo = getProjectRepository();
+    const projects = await projectRepo.findAll();
+    const project = projects[0]; // Use first project
+
+    const creatorAddress = project?.creator_address || process.env.NFT_CREATOR_ADDRESS || updateKeypair.publicKey.toBase58();
+    const collectionSymbol = project?.collection_symbol || process.env.NFT_COLLECTION_SYMBOL || 'PGV2';
+    const sellerFeeBasisPoints = project?.seller_fee_basis_points ?? parseInt(process.env.NFT_SELLER_FEE_BASIS_POINTS || '690', 10);
+
+    console.log(`📋 Project settings from DB: symbol=${collectionSymbol}, fee=${sellerFeeBasisPoints}, creator=${creatorAddress}`);
 
     // ✅ Build metadata JSON in your desired format
     const metadata: NFTMetadata = {
-      name: `PGV2 #${assetId.slice(0, 6)}`, // (optional) your naming logic
+      name: `${collectionSymbol} #${assetId.slice(0, 6)}`,
       description:
         `Pepe Gods V2 - Arise from the Ashes, is a refined artistic evolution of the original Pepe Gods collection, created by Pepeverse and supported by a lot of utilities. ` +
         (txSignature ? `Payment Tx: ${txSignature}` : ''),

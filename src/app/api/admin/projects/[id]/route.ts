@@ -14,6 +14,9 @@ const updateProjectSchema = z.object({
   websiteUrl: z.union([z.string().url(), z.literal(''), z.undefined()]).optional(),
   collectionIds: z.array(z.string().min(32).max(44)).optional(),
   treasuryWallet: z.string().min(32).max(44).optional(),
+  sellerFeeBasisPoints: z.number().int().min(0).max(10000).optional(),
+  collectionSymbol: z.string().min(1).max(20).optional(),
+  creatorAddress: z.union([z.string().min(32).max(44), z.literal(''), z.undefined()]).optional(),
 });
 
 export async function GET(

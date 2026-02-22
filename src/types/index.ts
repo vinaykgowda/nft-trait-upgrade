@@ -88,6 +88,9 @@ export interface Project {
   websiteUrl?: string;
   collectionIds: string[];
   treasuryWallet: string;
+  sellerFeeBasisPoints?: number;
+  collectionSymbol?: string;
+  creatorAddress?: string;
   supportsSol?: boolean;
   tokens?: ProjectToken[];
 }

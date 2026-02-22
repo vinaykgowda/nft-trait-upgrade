@@ -14,6 +14,9 @@ interface Project {
   websiteUrl?: string;
   collectionIds: string[];
   treasuryWallet: string;
+  sellerFeeBasisPoints?: number;
+  collectionSymbol?: string;
+  creatorAddress?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -34,7 +37,10 @@ export default function ProjectsPage() {
     magicedenUrl: '',
     websiteUrl: '',
     collectionIds: [''],
-    treasuryWallet: ''
+    treasuryWallet: '',
+    sellerFeeBasisPoints: 690,
+    collectionSymbol: 'PGV2',
+    creatorAddress: ''
   });
 
   useEffect(() => {
@@ -145,7 +151,10 @@ export default function ProjectsPage() {
       magicedenUrl: '',
       websiteUrl: '',
       collectionIds: [''],
-      treasuryWallet: ''
+      treasuryWallet: '',
+      sellerFeeBasisPoints: 690,
+      collectionSymbol: 'PGV2',
+      creatorAddress: ''
     });
     setShowCreateForm(false);
     setEditingProject(null);
@@ -162,7 +171,10 @@ export default function ProjectsPage() {
       magicedenUrl: project.magicedenUrl || '',
       websiteUrl: project.websiteUrl || '',
       collectionIds: project.collectionIds.length > 0 ? project.collectionIds : [''],
-      treasuryWallet: project.treasuryWallet
+      treasuryWallet: project.treasuryWallet,
+      sellerFeeBasisPoints: project.sellerFeeBasisPoints ?? 690,
+      collectionSymbol: project.collectionSymbol || 'PGV2',
+      creatorAddress: project.creatorAddress || ''
     });
     setEditingProject(project);
     setShowCreateForm(true);
@@ -246,6 +258,43 @@ export default function ProjectsPage() {
                     onChange={(e) => setFormData({...formData, treasuryWallet: e.target.value})}
                     className="w-full bg-black border border-green-600 rounded px-3 py-2 text-green-400 focus:outline-none focus:border-green-400"
                     required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Seller Fee Basis Points *</label>
+                  <input
+                    type="number"
+                    value={formData.sellerFeeBasisPoints}
+                    onChange={(e) => setFormData({...formData, sellerFeeBasisPoints: parseInt(e.target.value) || 0})}
+                    className="w-full bg-black border border-green-600 rounded px-3 py-2 text-green-400 focus:outline-none focus:border-green-400"
+                    min={0}
+                    max={10000}
+                    required
+                  />
+                  <p className="text-gray-500 text-xs mt-1">{(formData.sellerFeeBasisPoints / 100).toFixed(2)}% royalty (690 = 6.9%)</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Collection Symbol *</label>
+                  <input
+                    type="text"
+                    value={formData.collectionSymbol}
+                    onChange={(e) => setFormData({...formData, collectionSymbol: e.target.value})}
+                    className="w-full bg-black border border-green-600 rounded px-3 py-2 text-green-400 focus:outline-none focus:border-green-400"
+                    maxLength={20}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Creator Address</label>
+                  <input
+                    type="text"
+                    value={formData.creatorAddress}
+                    onChange={(e) => setFormData({...formData, creatorAddress: e.target.value})}
+                    className="w-full bg-black border border-green-600 rounded px-3 py-2 text-green-400 focus:outline-none focus:border-green-400"
+                    placeholder="Falls back to update authority if empty"
                   />
                 </div>
               </div>
@@ -410,6 +459,20 @@ export default function ProjectsPage() {
                     <span className="text-gray-400">Collections:</span>
                     <span className="ml-2">{project.collectionIds.length}</span>
                   </div>
+                  <div>
+                    <span className="text-gray-400">Seller Fee:</span>
+                    <span className="ml-2">{project.sellerFeeBasisPoints ?? 690} bps ({((project.sellerFeeBasisPoints ?? 690) / 100).toFixed(2)}%)</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-400">Symbol:</span>
+                    <span className="ml-2">{project.collectionSymbol || 'PGV2'}</span>
+                  </div>
+                  {project.creatorAddress && (
+                    <div className="md:col-span-2">
+                      <span className="text-gray-400">Creator Address:</span>
+                      <span className="ml-2 font-mono text-green-300">{project.creatorAddress}</span>
+                    </div>
+                  )}
                   <div>
                     <span className="text-gray-400">Created:</span>
                     <span className="ml-2">{new Date(project.createdAt).toLocaleDateString()}</span>

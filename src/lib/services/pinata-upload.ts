@@ -10,43 +10,42 @@ import { PinataSDK } from 'pinata';
  * Requirements: 2.1, 2.2, 5.3, 5.4
  */
 export class PinataUploadService {
-  private jwt: string;
-  private gateway: string;
-  private pinata: PinataSDK;
+  private pinata: PinataSDK | null = null;
 
   /**
-   * Initialize Pinata upload service with JWT authentication and gateway configuration.
-   * 
-   * During build time, uses placeholder values. At runtime, requires valid credentials.
+   * Initialize Pinata upload service.
+   * Environment variables are read at runtime in each method, not in constructor.
    * 
    * Requirements: 2.2, 5.3, 5.4
    */
   constructor() {
-    // Validate PINATA_JWT
+    // Don't initialize here - do it lazily in methods to ensure runtime env vars are read
+  }
+
+  /**
+   * Get or initialize Pinata SDK instance with runtime environment variables
+   */
+  private getPinataInstance(): { pinata: PinataSDK; gateway: string } {
     const jwt = process.env.PINATA_JWT;
     const gateway = process.env.PINATA_GATEWAY;
     
-    // If credentials are missing, use placeholders (for build time)
-    // At runtime, the actual API calls will fail with clear error messages
     if (!jwt || !gateway) {
-      this.jwt = 'build-time-placeholder';
-      this.gateway = 'build-time-placeholder.pinata.cloud';
-      this.pinata = null as any; // Will fail if actually used
-      return;
+      throw new Error('PINATA_JWT and PINATA_GATEWAY environment variables are required. Please configure them in your deployment settings.');
     }
-    
-    this.jwt = jwt;
-    this.gateway = gateway;
 
-    // Initialize Pinata SDK
-    this.pinata = new PinataSDK({
-      pinataJwt: this.jwt,
-    });
+    // Initialize Pinata SDK if not already done
+    if (!this.pinata) {
+      this.pinata = new PinataSDK({
+        pinataJwt: jwt,
+      });
 
-    // Log service initialization with gateway config (Requirement 12.4)
-    console.log('🔑 Pinata service initialized');
-    console.log(`- Gateway configured: ${this.gateway}`);
-    console.log(`- Authentication: JWT configured`);
+      // Log service initialization with gateway config (Requirement 12.4)
+      console.log('🔑 Pinata service initialized');
+      console.log(`- Gateway configured: ${gateway}`);
+      console.log(`- Authentication: JWT configured`);
+    }
+
+    return { pinata: this.pinata, gateway };
   }
 
   /**
@@ -64,14 +63,12 @@ export class PinataUploadService {
     contentType: string,
     metadata?: Record<string, string>
   ): Promise<PinataUploadResult> {
-    // Runtime validation
-    if (!this.pinata || this.jwt === 'build-time-placeholder') {
-      throw new Error('PINATA_JWT and PINATA_GATEWAY environment variables are required. Please configure them in your deployment settings.');
-    }
-    
     const startTime = Date.now();
     
     try {
+      // Get Pinata instance with runtime environment variables
+      const { pinata, gateway } = this.getPinataInstance();
+      
       console.log(`📤 Uploading image to Pinata...`);
       console.log(`- Buffer size: ${imageBuffer.length} bytes`);
       console.log(`- Content type: ${contentType}`);
@@ -83,7 +80,7 @@ export class PinataUploadService {
       // Upload to Pinata with authentication headers (Requirement 3.5)
       // The SDK automatically includes JWT authentication
       // Access the public upload API (public is a property name, not a keyword here)
-      let uploadBuilder = this.pinata.upload.public.file(file);
+      let uploadBuilder = pinata.upload.public.file(file);
       
       // Add optional metadata as keyvalues if provided
       if (metadata) {
@@ -94,7 +91,7 @@ export class PinataUploadService {
 
       const duration = Date.now() - startTime;
       const cid = uploadResult.cid;
-      const url = this.constructGatewayUrl(cid);
+      const url = this.constructGatewayUrl(cid, gateway);
 
       // Log success (Requirement 12.2)
       console.log(`✅ Image uploaded successfully`);
@@ -147,14 +144,12 @@ export class PinataUploadService {
   async uploadMetadata(
     metadata: NFTMetadata
   ): Promise<PinataUploadResult> {
-    // Runtime validation
-    if (!this.pinata || this.jwt === 'build-time-placeholder') {
-      throw new Error('PINATA_JWT and PINATA_GATEWAY environment variables are required. Please configure them in your deployment settings.');
-    }
-    
     const startTime = Date.now();
     
     try {
+      // Get Pinata instance with runtime environment variables
+      const { pinata, gateway } = this.getPinataInstance();
+      
       console.log(`📤 Uploading metadata to Pinata...`);
       console.log(`- Metadata name: ${metadata.name}`);
       console.log(`- Attributes count: ${metadata.attributes?.length || 0}`);
@@ -167,11 +162,11 @@ export class PinataUploadService {
 
       // Upload to Pinata with content-type "application/json" (Requirement 4.2)
       // The SDK automatically includes JWT authentication
-      const uploadResult = await this.pinata.upload.public.json(metadata);
+      const uploadResult = await pinata.upload.public.json(metadata);
 
       const duration = Date.now() - startTime;
       const cid = uploadResult.cid;
-      const url = this.constructGatewayUrl(cid);
+      const url = this.constructGatewayUrl(cid, gateway);
 
       // Log success (Requirement 12.2)
       console.log(`✅ Metadata uploaded successfully`);
@@ -216,18 +211,19 @@ export class PinataUploadService {
    * Construct gateway URL from CID
    * 
    * @param cid - IPFS Content Identifier
+   * @param gateway - Gateway domain
    * @returns Full HTTPS gateway URL
    * 
    * Requirements: 3.4, 4.4, 14.1, 14.2, 14.3
    */
-  private constructGatewayUrl(cid: string): string {
+  private constructGatewayUrl(cid: string, gateway: string): string {
     // Validate CID is non-empty (Requirement 14.3)
     if (!cid || cid.trim().length === 0) {
       throw new Error('CID must be non-empty');
     }
 
     // Remove any trailing slashes from gateway (Requirement 14.2)
-    const cleanGateway = this.gateway.replace(/\/+$/, '');
+    const cleanGateway = gateway.replace(/\/+$/, '');
 
     // Construct URL as https://{gateway}/ipfs/{cid} (Requirement 14.1)
     const url = `https://${cleanGateway}/ipfs/${cid}`;

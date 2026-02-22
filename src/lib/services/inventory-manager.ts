@@ -158,6 +158,13 @@ export class InventoryManager {
           };
         }
 
+        // Decrement remaining_supply on the trait (only if it has limited supply)
+        await client.query(
+          `UPDATE traits SET remaining_supply = remaining_supply - 1
+           WHERE id = $1 AND remaining_supply IS NOT NULL AND remaining_supply > 0`,
+          [consumedReservation.trait_id]
+        );
+
         // Create purchase record using domain model conversion
         const purchaseDomain = {
           ...purchaseData,

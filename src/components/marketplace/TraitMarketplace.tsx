@@ -181,6 +181,8 @@ export function TraitMarketplace() {
     });
     setShowPurchaseFlow(false);
     setSelectedTraits({});
+    // Refresh traits to update remaining supply counts
+    fetchData();
   };
 
   const handlePurchaseCancel = () => {

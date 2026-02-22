@@ -4,7 +4,8 @@ import { Connection, Keypair } from '@solana/web3.js';
 import bs58 from 'bs58';
 
 import { CoreAssetUpdateService } from '@/lib/services/core-asset-update';
-import { IrysUploadService, NFTMetadata } from '@/lib/services/irys-upload';
+import { PinataUploadService } from '@/lib/services/pinata-upload';
+import { NFTMetadata } from '@/types';
 import { getTraitSlotRepository } from '@/lib/repositories';
 
 const BodySchema = z.object({
@@ -104,17 +105,17 @@ export async function POST(request: NextRequest) {
       external_url: process.env.NEXT_PUBLIC_APP_URL || '',
       attributes: completeAttributes,
       properties: {
-        files: [{ uri: newImageUrl, type: 'image/png' }],
+        files: [{ uri: newImageUrl, type: 'image/webp' }],
         category: 'image',
         creators: [{ address: creatorAddress, share: 100 }],
       },
     };
 
-    // ✅ Upload metadata JSON to Irys (returns metadata URI)
-    const irys = new IrysUploadService();
-    const metadataResult = await irys.uploadMetadata(metadata);
+    // ✅ Upload metadata JSON to Pinata (returns metadata URI)
+    const pinata = new PinataUploadService();
+    const metadataResult = await pinata.uploadMetadata(metadata);
 
-    // ✅ Update Core asset URI to the Irys metadata URL (small tx)
+    // ✅ Update Core asset URI to the Pinata metadata URL (small tx)
     const core = new CoreAssetUpdateService(connection, updateKeypair);
     const updateResult = await core.updateAssetUri(assetId, metadataResult.url);
 
@@ -122,6 +123,7 @@ export async function POST(request: NextRequest) {
       success: true,
       assetId,
       metadataUri: metadataResult.url,
+      metadataCid: metadataResult.cid,
       updateSignature: updateResult.signature,
       totalAttributes: completeAttributes.length,
       updatedSlotIds: Array.from(updatedTraitsBySlotId.keys()),

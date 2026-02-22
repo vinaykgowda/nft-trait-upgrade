@@ -1,16 +1,16 @@
-import { IrysUploadService } from './irys-upload';
+import { PinataUploadService } from './pinata-upload';
 import { put } from '@vercel/blob';
 
 export interface ImageStorageOptions {
   category: string;
   rarity: string;
   filename: string;
-  permanent?: boolean; // true = Irys (blockchain permanent), false = Vercel Blob (persistent, cheaper)
+  permanent?: boolean; // true = Pinata IPFS (decentralized permanent), false = Vercel Blob (persistent, cheaper)
 }
 
 export class ImageStorageService {
   /**
-   * Store an image file using either Vercel Blob (persistent, cheaper) or Irys (blockchain permanent)
+   * Store an image file using either Vercel Blob (persistent, cheaper) or Pinata IPFS (decentralized permanent)
    * Returns the public URL of the uploaded image
    *
    * DEFAULT: Vercel Blob - Perfect for trait images that need to be accessible for NFT composition
@@ -19,33 +19,33 @@ export class ImageStorageService {
     const { permanent = false } = options; // Default to Vercel Blob (persistent & cheaper)
 
     if (permanent) {
-      return this.storeImageIrys(file, options);
+      return this.storeImagePinata(file, options);
     } else {
       return this.storeImageVercelBlob(file, options);
     }
   }
 
   /**
-   * Store image permanently on blockchain via Irys (~$0.001-0.005 per image)
-   * Use for: Final NFT images, metadata that needs blockchain permanence
+   * Store image permanently on IPFS via Pinata
+   * Use for: Final NFT images, metadata that needs decentralized permanence
    */
-  private static async storeImageIrys(file: File, options: ImageStorageOptions): Promise<string> {
+  private static async storeImagePinata(file: File, options: ImageStorageOptions): Promise<string> {
     try {
-      // Initialize Irys service (signing + funding handled inside using IRYS_PRIVATE_KEY)
-      const irysService = new IrysUploadService();
+      // Initialize Pinata service
+      const pinataService = new PinataUploadService();
 
       // Convert File to Buffer
       const arrayBuffer = await file.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
 
-      // Upload to Irys
-      const result = await irysService.uploadImage(buffer, file.type);
+      // Upload to Pinata IPFS
+      const result = await pinataService.uploadImage(buffer, file.type);
 
-      console.log(`✅ Image uploaded to Irys (blockchain permanent): ${result.url}`);
+      console.log(`✅ Image uploaded to Pinata IPFS (decentralized permanent): ${result.url}`);
       return result.url;
     } catch (error) {
-      console.error('Failed to upload image to Irys:', error);
-      throw new Error('Failed to upload image to blockchain storage');
+      console.error('Failed to upload image to Pinata:', error);
+      throw new Error('Failed to upload image to IPFS storage');
     }
   }
 
@@ -86,9 +86,9 @@ export class ImageStorageService {
    * Delete an image file
    */
   static async deleteImage(imageUrl: string): Promise<boolean> {
-    if (imageUrl.includes('irys.xyz') || imageUrl.includes('arweave.net')) {
-      // Irys/Arweave files are permanent - cannot delete
-      console.log(`Note: Irys/Arweave files are permanent, cannot delete: ${imageUrl}`);
+    if (imageUrl.includes('pinata.cloud') || imageUrl.includes('/ipfs/')) {
+      // IPFS files are permanent - cannot delete
+      console.log(`Note: IPFS files are permanent, cannot delete: ${imageUrl}`);
       return true;
     }
 

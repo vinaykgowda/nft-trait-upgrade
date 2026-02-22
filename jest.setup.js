@@ -70,8 +70,10 @@ global.Headers = class MockHeaders extends Map {
 
 global.URL = class MockURL {
   constructor(url, base) {
-    const fullUrl = base ? new URL(url, base).href : url;
-    const parsed = new URL(fullUrl);
+    // Use native URL parsing to avoid recursion
+    const { URL: NativeURL } = require('url');
+    const fullUrl = base ? new NativeURL(url, base).href : url;
+    const parsed = new NativeURL(fullUrl);
     this.href = parsed.href;
     this.origin = parsed.origin;
     this.protocol = parsed.protocol;

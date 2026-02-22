@@ -1,5 +1,5 @@
-import { CoreAsset, Trait, TraitSlot } from '@/types';
-import { NFTMetadata, IrysUploadService } from './irys-upload';
+import { CoreAsset, Trait, TraitSlot, NFTMetadata } from '@/types';
+import { PinataUploadService } from './pinata-upload';
 import { TraitSelection } from './preview';
 
 export interface MetadataBuilderOptions {
@@ -21,14 +21,16 @@ const ALLOWED_METADATA_DOMAINS = [
   'adznwylv2j3tfcl7.public.blob.vercel-storage.com', // Your Vercel Blob domain
   'devnet.irys.xyz',
   'node1.irys.xyz',
-  'node2.irys.xyz'
-];
+  'node2.irys.xyz',
+  'gateway.pinata.cloud',
+  process.env.PINATA_GATEWAY
+].filter(Boolean); // Filter out undefined values
 
 export class MetadataService {
-  private irysService: IrysUploadService;
+  private pinataService: PinataUploadService;
 
-  constructor(irysService: IrysUploadService) {
-    this.irysService = irysService;
+  constructor(pinataService: PinataUploadService) {
+    this.pinataService = pinataService;
   }
 
   /**
@@ -150,8 +152,8 @@ export class MetadataService {
       // Build metadata with proper slot names
       const metadata = this.buildMetadata(baseAsset, appliedTraits, traitSlots, options);
 
-      // Upload image and metadata to Irys - FIXED: Use JPEG format
-      const imageResult = await this.irysService.uploadImage(imageBuffer, 'image/jpeg');
+      // Upload image and metadata to Pinata - Use WebP format
+      const imageResult = await this.pinataService.uploadImage(imageBuffer, 'image/webp');
       
       // Update metadata with image URL
       const completeMetadata = {
@@ -162,14 +164,14 @@ export class MetadataService {
           files: [
             {
               uri: imageResult.url,
-              type: 'image/jpeg'
+              type: 'image/webp'
             },
             ...(metadata.properties?.files || [])
           ]
         }
       };
       
-      const metadataResult = await this.irysService.uploadMetadata(completeMetadata);
+      const metadataResult = await this.pinataService.uploadMetadata(completeMetadata);
 
       console.log('✅ Metadata uploaded with proper files array:', {
         imageUri: imageResult.url,
@@ -238,8 +240,8 @@ export class MetadataService {
         sellerFeeBasisPoints: options.sellerFeeBasisPoints || existingMetadata.seller_fee_basis_points || baseAsset.seller_fee_basis_points
       });
 
-      // Upload new image and metadata - FIXED: Use JPEG format
-      const imageResult = await this.irysService.uploadImage(imageBuffer, 'image/jpeg');
+      // Upload new image and metadata - Use WebP format
+      const imageResult = await this.pinataService.uploadImage(imageBuffer, 'image/webp');
       
       // Update metadata with image URL
       const completeNewMetadata = {
@@ -250,14 +252,14 @@ export class MetadataService {
           files: [
             {
               uri: imageResult.url,
-              type: 'image/jpeg'
+              type: 'image/webp'
             },
             ...(newMetadata.properties?.files || [])
           ]
         }
       };
       
-      const metadataResult = await this.irysService.uploadMetadata(completeNewMetadata);
+      const metadataResult = await this.pinataService.uploadMetadata(completeNewMetadata);
 
       console.log('✅ Metadata updated with SSRF protection and proper format');
 

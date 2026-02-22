@@ -138,3 +138,35 @@ export interface AuditLog {
   userAgent?: string;
   createdAt: Date;
 }
+
+// Pinata IPFS Upload Types
+export interface PinataUploadResult {
+  cid: string;           // IPFS Content Identifier
+  url: string;           // Full gateway URL
+  size: number;          // File size in bytes
+  contentType: string;   // MIME type
+}
+
+export interface NFTMetadata {
+  name: string;
+  description: string;
+  symbol?: string;
+  seller_fee_basis_points?: number;
+  image: string;  // IPFS gateway URL
+  external_url?: string;
+  attributes: Array<{
+    trait_type: string;
+    value: string | number;
+  }>;
+  properties?: {
+    files?: Array<{
+      uri: string;        // IPFS gateway URL
+      type: string;       // MIME type (e.g., "image/webp")
+    }>;
+    category?: string;
+    creators?: Array<{
+      address: string;
+      share: number;
+    }>;
+  };
+}

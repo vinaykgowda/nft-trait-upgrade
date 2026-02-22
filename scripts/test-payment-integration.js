@@ -14,8 +14,7 @@ console.log('1. Environment Configuration:');
 const requiredEnvVars = [
   'TREASURY_WALLET',
   'LDZ_TOKEN_MINT',
-  'SOLANA_DELEGATE_PRIVATE_KEY',
-  'IRYS_PRIVATE_KEY'
+  'SOLANA_DELEGATE_PRIVATE_KEY'
 ];
 
 const envFile = require('fs').readFileSync('.env.local', 'utf8');

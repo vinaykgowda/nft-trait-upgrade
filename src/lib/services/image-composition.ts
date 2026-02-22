@@ -6,14 +6,14 @@ export interface CompositionResult {
   imageBuffer: Buffer;
   width: number;
   height: number;
-  format: 'png' | 'jpeg';
+  format: 'png' | 'jpeg' | 'webp';
 }
 
 export interface CompositionOptions {
   width?: number;
   height?: number;
-  format?: 'png' | 'jpeg';
-  quality?: number; // For JPEG
+  format?: 'png' | 'jpeg' | 'webp';
+  quality?: number; // For JPEG and WebP
   /**
    * OPTIONAL BUT IMPORTANT:
    * Pass the NFT's CURRENT traits here (full set), and pass ONLY overrides in selectedTraits.
@@ -177,7 +177,9 @@ export class ImageCompositionService {
     console.log(`🖼️ Generating final ${format} buffer...`);
     let imageBuffer: Buffer;
 
-    if (format === 'jpeg') {
+    if (format === 'webp') {
+      imageBuffer = await compositeImage.webp({ quality }).toBuffer();
+    } else if (format === 'jpeg') {
       imageBuffer = await compositeImage.jpeg({ quality }).toBuffer();
     } else {
       imageBuffer = await compositeImage.png().toBuffer();
@@ -252,7 +254,7 @@ export class ImageCompositionService {
 
   /**
    * Creates a final high-quality image composition for metadata.
-   * Fixed at 1500x1500 JPEG (quality 90).
+   * Fixed at 1500x1500 WebP (quality 90).
    */
   async createFinalComposition(
     baseImageUrl: string,
@@ -268,7 +270,7 @@ export class ImageCompositionService {
       {
         width: 1500,
         height: 1500,
-        format: 'jpeg',
+        format: 'webp',
         quality: 90,
         baseTraits,
         // final should always recompose cleanly
@@ -284,7 +286,7 @@ export class ImageCompositionService {
   static getStandardDimensions() {
     return {
       preview: { width: 512, height: 512, format: 'png' as const },
-      final: { width: 1500, height: 1500, format: 'jpeg' as const, quality: 90 }
+      final: { width: 1500, height: 1500, format: 'webp' as const, quality: 90 }
     };
   }
 

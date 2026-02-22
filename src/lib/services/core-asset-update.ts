@@ -235,14 +235,14 @@ export class CoreAssetUpdateService {
         }
       };
 
-      // Upload OFF-CHAIN metadata JSON to Irys if no metadata URI is provided.
+      // Upload OFF-CHAIN metadata JSON to Pinata IPFS if no metadata URI is provided.
       // This avoids putting JSON directly on-chain (tx too large).
       if (!newMetadataUri) {
-        const { IrysUploadService } = await import('./irys-upload');
-const irys = new IrysUploadService();
-        const uploaded = await irys.uploadMetadata(newMetadata);
+        const { PinataUploadService } = await import('./pinata-upload');
+        const pinata = new PinataUploadService();
+        const uploaded = await pinata.uploadMetadata(newMetadata);
         newMetadataUri = uploaded.url;
-        console.log('✅ Metadata JSON uploaded to Irys:', newMetadataUri);
+        console.log('✅ Metadata JSON uploaded to Pinata IPFS:', newMetadataUri);
       }
 
       if (!newMetadataUri.startsWith('http')) {

@@ -20,7 +20,7 @@ const customJestConfig = {
     '<rootDir>/src/**/*.test.{js,jsx,ts,tsx}',
   ],
   transformIgnorePatterns: [
-    'node_modules/(?!(jose)/)',
+    'node_modules/(?!(jose|uuid|@solana|@metaplex-foundation)/)',
   ],
 }
 

@@ -53,11 +53,11 @@ NEXT_PUBLIC_SOLANA_NETWORK=mainnet-beta
 
 # Wallet Keys (base58 format)
 SOLANA_DELEGATE_PRIVATE_KEY=your-delegate-key-base58
-IRYS_PRIVATE_KEY=your-irys-key-base58
 UPDATE_AUTHORITY_PRIVATE_KEY=your-update-authority-key-base58
 
-# Storage
-IRYS_NODE_URL=https://node1.irys.xyz
+# Storage - Pinata IPFS
+PINATA_JWT=your-pinata-jwt-token
+PINATA_GATEWAY=your-gateway-subdomain.mypinata.cloud
 
 # App Configuration
 NODE_ENV=production
@@ -90,9 +90,15 @@ LDZ_TOKEN_MINT=your-token-mint
 - **Frontend**: Next.js 14, React, TailwindCSS
 - **Backend**: Next.js API routes, PostgreSQL
 - **Blockchain**: Solana, Metaplex Core, @solana/web3.js
-- **Storage**: Irys (Arweave), Local file system
+- **Storage**: Pinata IPFS (decentralized storage)
 - **Authentication**: Custom JWT with MFA support
 - **Testing**: Jest, Property-based testing
+
+### Environment Variables
+
+**PINATA_JWT**: JWT token for authenticating with Pinata's IPFS API. Get this from your [Pinata dashboard](https://app.pinata.cloud) under API Keys.
+
+**PINATA_GATEWAY**: Your dedicated Pinata gateway subdomain (e.g., `fun-llama-300.mypinata.cloud`). This is used to construct IPFS gateway URLs for accessing uploaded content.
 
 ## 📁 Project Structure
 

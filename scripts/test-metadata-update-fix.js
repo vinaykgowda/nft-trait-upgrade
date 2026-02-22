@@ -17,7 +17,6 @@ async function testMetadataUpdate() {
     console.log('\n📋 Environment Check:');
     console.log('- NODE_ENV:', process.env.NODE_ENV);
     console.log('- SOLANA_DELEGATE_PRIVATE_KEY:', process.env.SOLANA_DELEGATE_PRIVATE_KEY ? 'SET' : 'NOT SET');
-    console.log('- IRYS_PRIVATE_KEY:', process.env.IRYS_PRIVATE_KEY ? 'SET' : 'NOT SET');
     console.log('- HELIUS_API_KEY:', process.env.HELIUS_API_KEY ? 'SET' : 'NOT SET');
     
     // Test delegate keypair initialization

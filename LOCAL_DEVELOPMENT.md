@@ -72,14 +72,31 @@ ADMIN_SESSION_SECRET="your-local-admin-secret-here-32-chars-minimum"
 SOLANA_RPC_URL="https://api.devnet.solana.com"
 SOLANA_DELEGATE_PRIVATE_KEY="your-devnet-wallet-private-key-here"
 
-# Irys (for development)
-IRYS_NODE_URL="https://devnet.irys.xyz"
-IRYS_PRIVATE_KEY="your-devnet-wallet-private-key-here"
+# Pinata IPFS (for development)
+PINATA_JWT="your-pinata-jwt-token-here"
+PINATA_GATEWAY="your-gateway-subdomain.mypinata.cloud"
+
+# NFT Update Authority
+UPDATE_AUTHORITY_PRIVATE_KEY="your-devnet-wallet-private-key-here"
 
 # Development flags
 NODE_ENV="development"
 NEXT_PUBLIC_SOLANA_NETWORK="devnet"
 ```
+
+### Getting Pinata Credentials
+
+For local development, you can use the same Pinata account as production or create a separate test account:
+
+1. **Sign up at [Pinata](https://app.pinata.cloud)** (free tier available)
+2. **Create API Key**:
+   - Go to API Keys → New Key
+   - Enable "pinFileToIPFS" and "pinJSONToIPFS"
+   - Copy the JWT token → use as `PINATA_JWT`
+3. **Get Gateway**:
+   - Go to Gateways
+   - Copy your gateway domain → use as `PINATA_GATEWAY`
+   - Example: `fun-llama-300.mypinata.cloud` (without `https://`)
 
 ## Initial Setup & Testing
 

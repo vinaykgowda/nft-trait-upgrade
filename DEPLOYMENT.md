@@ -12,7 +12,7 @@
 
 3. **Solana Wallet**: Create a delegate wallet for signing transactions
 
-4. **Irys Account**: Set up Irys for decentralized storage
+4. **Pinata Account**: Set up Pinata for IPFS decentralized storage
 
 ## Environment Variables
 
@@ -27,8 +27,9 @@ Set these in your Vercel project settings as **sensitive environment variables**
 | `ADMIN_SESSION_SECRET` | Admin session secret (32+ chars) | `your-admin-secret` |
 | `SOLANA_RPC_URL` | Solana RPC endpoint | `https://api.mainnet-beta.solana.com` |
 | `SOLANA_DELEGATE_PRIVATE_KEY` | Delegate wallet private key | `base58-encoded-key` |
-| `IRYS_PRIVATE_KEY` | Irys wallet private key | `base58-encoded-key` |
-| `IRYS_NODE_URL` | Irys node URL | `https://node1.irys.xyz` |
+| `UPDATE_AUTHORITY_PRIVATE_KEY` | Update authority private key | `base58-encoded-key` |
+| `PINATA_JWT` | Pinata API JWT token | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` |
+| `PINATA_GATEWAY` | Pinata gateway domain | `fun-llama-300.mypinata.cloud` |
 
 ### Setting Environment Variables in Vercel
 
@@ -89,7 +90,7 @@ Run the verification script:
 - [ ] Admin login works
 - [ ] Database connectivity confirmed
 - [ ] Solana RPC connectivity working
-- [ ] Irys uploads functional
+- [ ] Pinata IPFS uploads functional
 - [ ] Wallet connection works on frontend
 - [ ] Trait browsing displays correctly
 - [ ] Purchase flow completes successfully
@@ -125,7 +126,7 @@ Check Vercel function logs for:
 - Authentication failures
 - Transaction build errors
 - Database connection issues
-- Irys upload failures
+- Pinata upload failures
 
 ### Regular Maintenance
 
@@ -168,10 +169,11 @@ Check Vercel function logs for:
    - Check rate limits
    - Consider using custom RPC
 
-3. **Irys Upload Failures**:
-   - Verify private key format
-   - Check Irys node status
-   - Monitor upload quotas
+3. **Pinata Upload Failures**:
+   - Verify JWT token is valid
+   - Check Pinata account status
+   - Monitor upload quotas and plan limits
+   - Verify gateway domain configuration
 
 4. **Authentication Problems**:
    - Verify session secrets

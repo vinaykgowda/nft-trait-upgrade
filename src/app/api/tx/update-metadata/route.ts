@@ -4,7 +4,7 @@ import { TransactionBuilder } from '@/lib/services/transaction-builder';
 import { createApiResponse, getRequestId } from '@/lib/api/response';
 import { validateRequestBody } from '@/lib/api/validation';
 import { HeliusService } from '@/lib/services/helius';
-import { IrysUploadService } from '@/lib/services/irys-upload';
+import { PinataUploadService } from '@/lib/services/pinata-upload';
 
 const metadataUpdateSchema = z.object({
   walletAddress: z.string().min(32).max(44),
@@ -153,16 +153,16 @@ export async function POST(request: NextRequest) {
       image: metadataJson.image,
     });
 
-    // 3) Upload metadata JSON to Irys (THIS is the key fix for tx size)
-    const irys = new IrysUploadService();
-    const uploaded = await irys.uploadMetadata(metadataJson as any, {
+    // 3) Upload metadata JSON to Pinata IPFS (THIS is the key fix for tx size)
+    const pinata = new PinataUploadService();
+    const uploaded = await pinata.uploadMetadata(metadataJson as any, {
       'X-Request-Id': requestId,
       'X-Asset-Id': body.assetId,
     });
 
-    const newMetadataUri = uploaded.url; // https://gateway.irys.xyz/<id>
+    const newMetadataUri = uploaded.url; // IPFS gateway URL
 
-    console.log('✅ Metadata JSON uploaded to Irys:', newMetadataUri);
+    console.log('✅ Metadata JSON uploaded to Pinata IPFS:', newMetadataUri);
 
     // 4) Build transaction that updates the Core asset URI to this metadata URL
     const txBuilder = new TransactionBuilder();

@@ -19,7 +19,7 @@ const schema = z.object({
   selectedTraits: z.union([z.record(z.any()), z.array(z.string())]),
   width: z.number().optional(),
   height: z.number().optional(),
-  format: z.enum(['png', 'jpeg']).optional(),
+  format: z.enum(['png', 'jpeg', 'webp']).optional(),
   quality: z.number().optional(),
   forceTransparentBase: z.boolean().optional(),
 });
@@ -194,7 +194,7 @@ export async function POST(req: NextRequest) {
     const options: any = {
       width: body.width,
       height: body.height,
-      format: body.format,
+      format: body.format || 'webp',  // Default to 'webp' if not specified
       quality: body.quality,
       forceTransparentBase: body.forceTransparentBase ?? true,
 

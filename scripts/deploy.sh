@@ -12,8 +12,8 @@ required_vars=(
     "ADMIN_SESSION_SECRET"
     "SOLANA_RPC_URL"
     "SOLANA_DELEGATE_PRIVATE_KEY"
-    "IRYS_PRIVATE_KEY"
-    "IRYS_NODE_URL"
+    "PINATA_JWT"
+    "PINATA_GATEWAY"
 )
 
 echo "✅ Checking environment variables..."

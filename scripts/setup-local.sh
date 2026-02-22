@@ -10,7 +10,8 @@ if [ ! -f ".env.local" ]; then
     echo "   You'll need to set up:"
     echo "   - DATABASE_URL (PostgreSQL connection)"
     echo "   - SOLANA_DELEGATE_PRIVATE_KEY (devnet wallet)"
-    echo "   - IRYS_PRIVATE_KEY (devnet wallet)"
+    echo "   - PINATA_JWT (Pinata API token)"
+    echo "   - PINATA_GATEWAY (Pinata gateway domain)"
     echo ""
     echo "Press Enter when you've configured .env.local..."
     read

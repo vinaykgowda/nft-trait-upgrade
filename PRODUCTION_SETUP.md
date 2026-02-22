@@ -32,11 +32,11 @@ NEXT_PUBLIC_SOLANA_NETWORK=mainnet-beta
 
 # Wallet Keys (base58 format)
 SOLANA_DELEGATE_PRIVATE_KEY=your-delegate-key-base58
-IRYS_PRIVATE_KEY=your-irys-key-base58
 UPDATE_AUTHORITY_PRIVATE_KEY=your-update-authority-key-base58
 
-# Irys Storage
-IRYS_NODE_URL=https://node1.irys.xyz
+# Storage - Pinata IPFS
+PINATA_JWT=your-pinata-jwt-token
+PINATA_GATEWAY=your-gateway-subdomain.mypinata.cloud
 
 # App Configuration
 NODE_ENV=production
@@ -89,8 +89,33 @@ console.log(base58.encode(Buffer.from(keypair)));
 
 **Fund Your Wallets:**
 - Send SOL to delegate wallet (for transaction fees)
-- Fund Irys wallet for storage costs
+- Fund Pinata account for IPFS storage costs
 - Keep update authority wallet secure and offline
+
+### 3.5. Pinata IPFS Setup
+
+**Create Pinata Account:**
+1. Go to [Pinata](https://app.pinata.cloud) and create an account
+2. Choose a plan (free tier available for testing)
+
+**Get API Credentials:**
+1. Navigate to API Keys in your Pinata dashboard
+2. Click "New Key"
+3. Enable "pinFileToIPFS" and "pinJSONToIPFS" permissions
+4. Copy the JWT token (this is your `PINATA_JWT`)
+5. Save it securely - you won't be able to see it again
+
+**Get Gateway Domain:**
+1. Go to Gateways in your Pinata dashboard
+2. Create a new dedicated gateway or use the default
+3. Copy your gateway domain (e.g., `fun-llama-300.mypinata.cloud`)
+4. This is your `PINATA_GATEWAY` value (without `https://`)
+
+**Important Notes:**
+- Store your JWT token securely - treat it like a password
+- Dedicated gateways provide better performance and reliability
+- Monitor your Pinata usage to avoid hitting plan limits
+- Consider upgrading to a paid plan for production use
 
 ### 4. Deploy to Vercel
 
@@ -145,7 +170,7 @@ curl -X POST https://your-app.vercel.app/api/admin/login \
 - Set up uptime monitoring for `/api/health`
 - Monitor database performance
 - Track Solana RPC response times
-- Monitor Irys upload success rates
+- Monitor Pinata upload success rates
 
 **Error Tracking:**
 - Check Vercel function logs regularly
@@ -215,7 +240,7 @@ curl -X POST https://your-app.vercel.app/api/admin/login \
 ### Scaling Considerations
 - Monitor database performance as usage grows
 - Consider upgrading Solana RPC for higher throughput
-- Plan for increased Irys storage costs
+- Plan for increased Pinata storage costs
 - Monitor Vercel function execution limits
 
 ---

@@ -43,11 +43,11 @@ NEXT_PUBLIC_SOLANA_NETWORK=mainnet-beta
 
 # Wallet Keys (you'll need to convert your keypairs to base58)
 SOLANA_DELEGATE_PRIVATE_KEY=your-base58-delegate-key
-IRYS_PRIVATE_KEY=your-base58-irys-key
 UPDATE_AUTHORITY_PRIVATE_KEY=your-base58-update-authority-key
 
-# Storage
-IRYS_NODE_URL=https://node1.irys.xyz
+# Storage - Pinata IPFS
+PINATA_JWT=your-pinata-jwt-token
+PINATA_GATEWAY=your-gateway-subdomain.mypinata.cloud
 
 # App Configuration
 NODE_ENV=production
@@ -76,6 +76,29 @@ const bs58 = require('bs58');
 const keypair = JSON.parse(fs.readFileSync('your-keypair.json'));
 console.log(bs58.encode(Buffer.from(keypair)));
 "
+```
+
+### Step 4.5: Set Up Pinata IPFS
+
+**Get Pinata Credentials:**
+
+1. **Create Account**: Go to [Pinata](https://app.pinata.cloud) and sign up
+2. **Get JWT Token**:
+   - Navigate to "API Keys" in dashboard
+   - Click "New Key"
+   - Enable "pinFileToIPFS" and "pinJSONToIPFS" permissions
+   - Copy the JWT token (this is your `PINATA_JWT`)
+   - Store it securely - you can't view it again
+3. **Get Gateway Domain**:
+   - Go to "Gateways" in dashboard
+   - Create a dedicated gateway or use default
+   - Copy the gateway domain (e.g., `fun-llama-300.mypinata.cloud`)
+   - Use this as your `PINATA_GATEWAY` (without `https://`)
+
+**Add to Vercel Environment Variables:**
+```bash
+PINATA_JWT=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+PINATA_GATEWAY=fun-llama-300.mypinata.cloud
 ```
 
 ### Step 5: Run Database Migrations

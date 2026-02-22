@@ -29,7 +29,6 @@ function setupKeypair() {
     console.log('');
     console.log('# Solana Keypair Configuration');
     console.log(`SOLANA_DELEGATE_PRIVATE_KEY=${privateKeyString}`);
-    console.log(`IRYS_PRIVATE_KEY=${privateKeyString}`);
     console.log(`UPDATE_AUTHORITY_PRIVATE_KEY=${privateKeyString}`);
     console.log('');
     console.log('🔑 Public Key:', require('@solana/web3.js').Keypair.fromSecretKey(new Uint8Array(keypairData)).publicKey.toString());

@@ -7,7 +7,7 @@
 - [ ] Database migrations executed successfully
 - [ ] All environment variables configured in Vercel
 - [ ] Solana delegate wallet funded with SOL for transaction fees
-- [ ] Irys wallet funded for storage operations
+- [ ] Pinata account set up with API credentials
 - [ ] Admin user credentials prepared
 
 ### Security Review
@@ -62,7 +62,7 @@
 - [ ] Trait preview renders correctly
 - [ ] Purchase flow completes end-to-end
 - [ ] Transaction signing works
-- [ ] Irys uploads successful
+- [ ] Pinata IPFS uploads successful
 - [ ] Core asset updates applied
 
 ### Performance Testing

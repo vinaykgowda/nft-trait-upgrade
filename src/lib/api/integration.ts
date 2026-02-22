@@ -10,7 +10,7 @@ import { TransactionBuilder } from '@/lib/services/transaction-builder';
 import { InventoryManager } from '@/lib/services/inventory-manager';
 import { ImageCompositionService } from '@/lib/services/image-composition';
 import { MetadataService } from '@/lib/services/metadata';
-import { IrysUploadService } from '@/lib/services/irys-upload';
+import { PinataUploadService } from '@/lib/services/pinata-upload';
 import { CoreAssetUpdateService } from '@/lib/services/core-asset-update';
 import { createNFTService } from '@/lib/services/nft';
 import { PerformanceMonitor } from '@/lib/services/performance-monitor';
@@ -33,7 +33,7 @@ export interface ServiceContainer {
   inventoryManager: InventoryManager;
   imageComposition: ImageCompositionService;
   metadata: MetadataService;
-  irysUpload: IrysUploadService;
+  pinataUpload: PinataUploadService;
   coreAssetUpdate: CoreAssetUpdateService;
   nftService: ReturnType<typeof createNFTService>;
   
@@ -66,8 +66,8 @@ export interface ServiceContainer {
       transactionBuilder: new TransactionBuilder(),
       inventoryManager: new InventoryManager(),
       imageComposition: new ImageCompositionService(),
-      metadata: new MetadataService(new IrysUploadService()),
-      irysUpload: new IrysUploadService(),
+      metadata: new MetadataService(new PinataUploadService()),
+      pinataUpload: new PinataUploadService(),
       coreAssetUpdate: new CoreAssetUpdateService(mockConnection, mockKeypair),
       nftService: createNFTService(),
       
@@ -178,8 +178,8 @@ export class TraitPurchaseWorkflow {
         }
       );
 
-      // 7. Upload new image to Irys (simplified)
-      const imageUploadResult = await this.services.irysUpload.uploadImage(
+      // 7. Upload new image to Pinata IPFS (simplified)
+      const imageUploadResult = await this.services.pinataUpload.uploadImage(
         Buffer.from('mock_image_data'),
         'image/png'
       );
@@ -191,8 +191,8 @@ export class TraitPurchaseWorkflow {
         attributes: [],
       };
 
-      // 9. Upload metadata to Irys
-      const metadataUploadResult = await this.services.irysUpload.uploadImage(
+      // 9. Upload metadata to Pinata IPFS
+      const metadataUploadResult = await this.services.pinataUpload.uploadImage(
         Buffer.from(JSON.stringify(updatedMetadata)),
         'application/json'
       );
@@ -291,7 +291,7 @@ export class AdminOperationsWorkflow {
 
     try {
       // 1. Upload trait image to storage
-      const imageUploadResult = await this.services.irysUpload.uploadImage(
+      const imageUploadResult = await this.services.pinataUpload.uploadImage(
         params.imageFile,
         'image/png'
       );
@@ -429,14 +429,14 @@ export class SystemHealthWorkflow {
     const healthChecks = await Promise.allSettled([
       this.checkDatabaseHealth(),
       this.checkBlockchainHealth(),
-      this.checkIrysHealth(),
+      this.checkPinataHealth(),
       this.checkExternalServicesHealth(),
     ]);
 
     const services = {
       database: this.parseHealthCheck(healthChecks[0]),
       blockchain: this.parseHealthCheck(healthChecks[1]),
-      irys: this.parseHealthCheck(healthChecks[2]),
+      pinata: this.parseHealthCheck(healthChecks[2]),
       external: this.parseHealthCheck(healthChecks[3]),
     };
 
@@ -495,10 +495,10 @@ export class SystemHealthWorkflow {
     }
   }
 
-  private async checkIrysHealth() {
+  private async checkPinataHealth() {
     const start = Date.now();
     try {
-      // This would check Irys service health
+      // This would check Pinata IPFS service health
       // For now, return a mock response
       return {
         status: 'up' as const,

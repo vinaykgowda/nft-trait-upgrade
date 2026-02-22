@@ -301,14 +301,14 @@ export class TransactionBuilder {
         }
       };
 
-      // Upload OFF-CHAIN metadata JSON to Irys if caller did not provide a metadata URI.
+      // Upload OFF-CHAIN metadata JSON to Pinata IPFS if caller did not provide a metadata URI.
       if (!newMetadataUri) {
-        const { IrysUploadService } = await import('./irys-upload');
-const irys = new IrysUploadService();
-const uploaded = await irys.uploadMetadata(newMetadata);
+        const { PinataUploadService } = await import('./pinata-upload');
+        const pinata = new PinataUploadService();
+        const uploaded = await pinata.uploadMetadata(newMetadata);
 
         newMetadataUri = uploaded.url;
-        console.log('✅ Metadata JSON uploaded to Irys:', newMetadataUri);
+        console.log('✅ Metadata JSON uploaded to Pinata IPFS:', newMetadataUri);
       }
 
       if (!newMetadataUri.startsWith('http')) {

@@ -18,58 +18,42 @@ export function NFTGallery({ collectionIds, onNFTSelect, selectedNFT }: NFTGalle
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    if (connected && publicKey && collectionIds.length > 0) {
-      fetchNFTs();
-    } else {
-      setNfts([]);
-    }
+    if (connected && publicKey && collectionIds.length > 0) fetchNFTs();
+    else setNfts([]);
   }, [connected, publicKey, collectionIds]);
 
   const fetchNFTs = async () => {
     if (!publicKey) return;
-    setLoading(true);
-    setError(null);
+    setLoading(true); setError(null);
     try {
-      const response = await fetch(`/api/user/nfts?wallet=${publicKey.toBase58()}`);
-      if (!response.ok) throw new Error('Failed to fetch NFTs');
-      const userNFTs = await response.json();
-      setNfts(userNFTs);
+      const res = await fetch(`/api/user/nfts?wallet=${publicKey.toBase58()}`);
+      if (!res.ok) throw new Error('Failed to fetch NFTs');
+      setNfts(await res.json());
     } catch (err) {
       setError('Failed to load NFTs. Please try again.');
       console.error('Error fetching NFTs:', err);
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   if (!connected) {
-    return (
-      <div className="text-center py-8">
-        <p className="text-gray-500 text-sm">Connect your wallet to view your NFTs</p>
-      </div>
-    );
+    return <div className="text-center py-8"><p className="text-gray-500 text-sm">Connect your wallet to view your NFTs</p></div>;
   }
-
   if (loading) {
     return (
       <div className="text-center py-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-yellow-600 border-t-transparent mx-auto mb-3"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-yellow-600 border-t-transparent mx-auto mb-3" />
         <p className="text-gray-500 text-sm">Loading your champions...</p>
       </div>
     );
   }
-
   if (error) {
     return (
       <div className="text-center py-8">
         <p className="text-red-400 text-sm mb-3">{error}</p>
-        <button onClick={fetchNFTs} className="text-yellow-500 hover:text-yellow-400 text-sm underline">
-          Retry
-        </button>
+        <button onClick={fetchNFTs} className="text-yellow-500 hover:text-yellow-400 text-sm underline">Retry</button>
       </div>
     );
   }
-
   if (nfts.length === 0) {
     return (
       <div className="text-center py-8">
@@ -79,7 +63,7 @@ export function NFTGallery({ collectionIds, onNFTSelect, selectedNFT }: NFTGalle
     );
   }
 
-  const filteredNfts = nfts.filter(nft => {
+  const filtered = nfts.filter(nft => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
     return nft.name.toLowerCase().includes(q) || nft.address.toLowerCase().includes(q);
@@ -94,31 +78,22 @@ export function NFTGallery({ collectionIds, onNFTSelect, selectedNFT }: NFTGalle
         </svg>
         <input
           type="text"
-          placeholder="Search champions..."
+          placeholder="Search..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="w-full pl-9 pr-3 py-2 text-sm rounded-lg focus:outline-none focus:ring-1 focus:ring-yellow-600/50"
-          style={{
-            background: 'rgba(10, 10, 15, 0.6)',
-            border: '1px solid rgba(201, 168, 76, 0.15)',
-            color: '#e2d9c8',
-          }}
+          style={{ background: 'rgba(10,10,15,0.6)', border: '1px solid rgba(201,168,76,0.15)', color: '#e2d9c8' }}
         />
       </div>
 
-      {/* NFT Grid */}
-      <div className="max-h-[340px] lg:max-h-none overflow-y-auto pr-1">
-        <div className="grid grid-cols-3 gap-2.5">
-          {filteredNfts.map((nft) => (
-            <NFTCard
-              key={nft.address}
-              nft={nft}
-              selected={selectedNFT?.address === nft.address}
-              onClick={() => onNFTSelect?.(nft)}
-            />
+      {/* 4-column NFT Grid */}
+      <div className="overflow-y-auto pr-1" style={{ maxHeight: 'calc(100vh - 380px)' }}>
+        <div className="grid grid-cols-4 gap-2">
+          {filtered.map((nft) => (
+            <NFTCard key={nft.address} nft={nft} selected={selectedNFT?.address === nft.address} onClick={() => onNFTSelect?.(nft)} />
           ))}
-          {filteredNfts.length === 0 && (
-            <div className="col-span-3 text-center py-4 text-gray-500 text-sm">
+          {filtered.length === 0 && (
+            <div className="col-span-4 text-center py-4 text-gray-500 text-sm">
               No NFTs match &quot;{searchQuery}&quot;
             </div>
           )}
@@ -139,40 +114,25 @@ function NFTCard({ nft, selected, onClick }: NFTCardProps) {
     <div
       className="rounded-lg cursor-pointer transition-all duration-200 overflow-hidden"
       style={{
-        background: selected ? 'rgba(201, 168, 76, 0.08)' : 'rgba(10, 10, 15, 0.5)',
-        border: selected ? '1.5px solid rgba(201, 168, 76, 0.7)' : '1px solid rgba(201, 168, 76, 0.1)',
-        boxShadow: selected ? '0 0 16px rgba(201, 168, 76, 0.2)' : 'none',
+        background: selected ? 'rgba(201,168,76,0.08)' : 'rgba(10,10,15,0.5)',
+        border: selected ? '1.5px solid rgba(201,168,76,0.7)' : '1px solid rgba(201,168,76,0.1)',
+        boxShadow: selected ? '0 0 16px rgba(201,168,76,0.2)' : 'none',
       }}
       onClick={onClick}
-      onMouseEnter={(e) => {
-        if (!selected) {
-          (e.currentTarget as HTMLElement).style.borderColor = 'rgba(201, 168, 76, 0.35)';
-          (e.currentTarget as HTMLElement).style.boxShadow = '0 0 10px rgba(201, 168, 76, 0.1)';
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (!selected) {
-          (e.currentTarget as HTMLElement).style.borderColor = 'rgba(201, 168, 76, 0.1)';
-          (e.currentTarget as HTMLElement).style.boxShadow = 'none';
-        }
-      }}
+      onMouseEnter={(e) => { if (!selected) { (e.currentTarget).style.borderColor = 'rgba(201,168,76,0.35)'; (e.currentTarget).style.boxShadow = '0 0 10px rgba(201,168,76,0.1)'; }}}
+      onMouseLeave={(e) => { if (!selected) { (e.currentTarget).style.borderColor = 'rgba(201,168,76,0.1)'; (e.currentTarget).style.boxShadow = 'none'; }}}
     >
       <div className="aspect-square overflow-hidden bg-black/30">
-        <img
-          src={nft.image}
-          alt={nft.name}
-          className="w-full h-full object-cover"
-          onError={(e) => {
-            const target = e.target as HTMLImageElement;
-            target.src = `https://via.placeholder.com/400x400?text=${encodeURIComponent(nft.name)}`;
-          }}
+        <img src={nft.image} alt={nft.name} className="w-full h-full object-cover"
+          onError={(e) => { (e.target as HTMLImageElement).src = `https://via.placeholder.com/400x400?text=${encodeURIComponent(nft.name)}`; }}
         />
       </div>
-      <div className="p-2">
-        <h3 className="text-xs font-medium text-gray-200 truncate">{nft.name}</h3>
-        <p className="text-[10px] text-gray-500 truncate mt-0.5">
-          {nft.address.slice(0, 6)}...{nft.address.slice(-4)}
-        </p>
+      <div className="px-1.5 py-1.5">
+        <h3 className="text-[10px] font-medium text-gray-200 truncate">{nft.name}</h3>
+        <div className="flex items-center justify-between mt-0.5">
+          <span className="text-[9px] text-yellow-400 font-semibold">◆ 5.0</span>
+        </div>
+        <p className="text-[9px] text-gray-500 truncate">{nft.collection || 'Pepoverse'}</p>
       </div>
     </div>
   );

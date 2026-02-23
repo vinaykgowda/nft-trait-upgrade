@@ -224,6 +224,10 @@ body {
   box-shadow: 0 0 10px rgba(201, 168, 76, 0.3);
 }
 
+/* Hide scrollbar utility */
+.hide-scrollbar::-webkit-scrollbar { display: none; }
+.hide-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;

@@ -60,7 +60,7 @@ export function NFTGallery({ collectionIds, onNFTSelect, selectedNFT }: NFTGalle
   });
 
   return (
-    <div>
+    <div className="flex flex-col h-full min-h-0">
       <div className="relative mb-3">
         <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -70,7 +70,7 @@ export function NFTGallery({ collectionIds, onNFTSelect, selectedNFT }: NFTGalle
           style={{ background: 'rgba(10,10,15,0.6)', border: '1px solid rgba(201,168,76,0.15)', color: '#e2d9c8' }}
         />
       </div>
-      <div className="overflow-y-auto pr-1 max-h-[220px] sm:max-h-[calc(100vh-380px)]">
+      <div className="overflow-y-auto pr-1 flex-1 min-h-0">
         <div className="grid grid-cols-4 gap-2.5">
           {filtered.map((nft) => (
             <NFTCard key={nft.address} nft={nft} selected={selectedNFT?.address === nft.address} onClick={() => onNFTSelect?.(nft)} />

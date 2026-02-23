@@ -156,8 +156,8 @@ export function TraitMarketplace() {
   }
 
   return (
-    <div className="min-h-screen bg-cover bg-center bg-fixed" style={{ backgroundImage: "url('/bg.webp')", backgroundColor: '#0a0a0f' }}>
-      <div className="min-h-screen" style={{ background: 'rgba(5, 5, 10, 0.75)' }}>
+    <div className="h-screen overflow-hidden bg-cover bg-center bg-fixed" style={{ backgroundImage: "url('/bg.webp')", backgroundColor: '#0a0a0f' }}>
+      <div className="h-screen overflow-hidden" style={{ background: 'rgba(5, 5, 10, 0.75)' }}>
 
         {/* SUCCESS MODAL */}
         {purchaseSuccess && (
@@ -177,16 +177,17 @@ export function TraitMarketplace() {
           </div>
         )}
 
+        {/* CENTERED LOGO + WALLET */}
+        <div className="flex flex-col items-center pt-2 pb-1">
+          <img src="/logo.webp" alt="Pepeverse Trait Forge" className="h-20 sm:h-24 object-contain drop-shadow-2xl" />
+          <div className="mt-1"><WalletMultiButton /></div>
+        </div>
+
         {/* MAIN 2-COLUMN LAYOUT */}
-        <div className="flex flex-col lg:flex-row min-h-screen p-2 sm:p-3 gap-3">
+        <div className="flex flex-col lg:flex-row p-2 sm:p-3 gap-3" style={{ height: 'calc(100vh - 140px)' }}>
 
-          {/* LEFT COLUMN: Logo + NFTs */}
-          <div className="lg:w-[42%] flex flex-col gap-3 lg:h-screen lg:max-h-screen lg:sticky lg:top-0">
-            <div className="flex flex-col items-center pt-2">
-              <img src="/logo.webp" alt="Pepeverse Trait Forge" className="h-24 sm:h-32 lg:h-40 object-contain drop-shadow-2xl" />
-              <div className="mt-2"><WalletMultiButton /></div>
-            </div>
-
+          {/* LEFT COLUMN: NFTs */}
+          <div className="lg:w-[42%] flex flex-col min-h-0">
             <div className="forge-panel p-4 flex-1 flex flex-col min-h-0">
               <h2 className="font-cinzel text-yellow-400 text-base sm:text-lg tracking-widest uppercase mb-3 text-center">
                 Select Your Champion
@@ -196,7 +197,7 @@ export function TraitMarketplace() {
                   <p className="text-gray-500 text-sm text-center">Connect wallet to view available NFTs to forge</p>
                 </div>
               ) : (
-                <div className="flex-1 overflow-y-auto">
+                <div className="flex-1 overflow-y-auto min-h-0">
                   <NFTGallery collectionIds={collectionIds} onNFTSelect={handleNFTSelect} selectedNFT={selectedNFT || undefined} />
                 </div>
               )}
@@ -204,7 +205,7 @@ export function TraitMarketplace() {
           </div>
 
           {/* RIGHT COLUMN: Traits (top) + Preview (bottom) */}
-          <div className="lg:w-[58%] flex flex-col gap-3 lg:h-screen lg:max-h-screen lg:sticky lg:top-0">
+          <div className="lg:w-[58%] flex flex-col gap-3 min-h-0">
 
             {/* TOP: CHOOSE TRAIT TO FORGE */}
             <div className="forge-panel p-4 flex flex-col" style={{ minHeight: '300px' }}>

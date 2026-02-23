@@ -57,10 +57,7 @@ export function TraitMarketplace() {
   const traitsRowRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { fetchData(); }, []);
-
-  useEffect(() => {
-    if (slots.length > 0 && !activeSlotId) setActiveSlotId(slots[0].id);
-  }, [slots, activeSlotId]);
+  useEffect(() => { if (slots.length > 0 && !activeSlotId) setActiveSlotId(slots[0].id); }, [slots, activeSlotId]);
 
   const fetchData = async () => {
     try {
@@ -69,22 +66,16 @@ export function TraitMarketplace() {
         fetch('/api/project'), fetch('/api/traits?active=1'), fetch('/api/trait-slots')
       ]);
       if (!projectRes.ok || !traitsRes.ok || !slotsRes.ok) throw new Error('Failed to fetch data');
-      const [projectResult, traitsResult, slotsResult] = await Promise.all([
-        projectRes.json(), traitsRes.json(), slotsRes.json()
-      ]);
+      const [projectResult, traitsResult, slotsResult] = await Promise.all([projectRes.json(), traitsRes.json(), slotsRes.json()]);
       const projectData = projectResult.data || projectResult;
       setCollectionIds(projectData.collectionIds || []);
       setTraits(traitsResult.data || []);
       setSlots(slotsResult.data || []);
-    } catch (err) {
-      console.error('Error fetching data:', err);
-      setError('Failed to load data');
-    } finally { setLoading(false); }
+    } catch (err) { console.error('Error fetching data:', err); setError('Failed to load data'); }
+    finally { setLoading(false); }
   };
 
-  const handleNFTSelect = (nft: CoreAsset) => {
-    setSelectedNFT(nft); setSelectedTraits({}); setPurchaseSuccess(null);
-  };
+  const handleNFTSelect = (nft: CoreAsset) => { setSelectedNFT(nft); setSelectedTraits({}); setPurchaseSuccess(null); };
 
   const handleTraitSelect = (slotId: string, trait: Trait | null) => {
     if (trait && selectedNFT?.attributes) {
@@ -98,11 +89,7 @@ export function TraitMarketplace() {
       }
     }
     setDuplicateWarning(null);
-    setSelectedTraits(prev => {
-      const updated = { ...prev };
-      if (trait) updated[slotId] = trait; else delete updated[slotId];
-      return updated;
-    });
+    setSelectedTraits(prev => { const u = { ...prev }; if (trait) u[slotId] = trait; else delete u[slotId]; return u; });
   };
 
   const getTraitsForSlot = (slotId: string) => traits.filter(t => t.slotId === slotId);
@@ -121,8 +108,7 @@ export function TraitMarketplace() {
     let solTotal = 0, ldzTotal = 0;
     Object.values(selectedTraits).forEach(t => {
       const amt = Number(t.priceAmount);
-      if (t.priceToken.symbol === 'SOL') solTotal += amt;
-      else if (t.priceToken.symbol === 'LDZ') ldzTotal += amt;
+      if (t.priceToken.symbol === 'SOL') solTotal += amt; else if (t.priceToken.symbol === 'LDZ') ldzTotal += amt;
     });
     if (solTotal > 0 && ldzTotal > 0) return { isMixed: true, ldzAmount: ldzTotal, solAmount: solTotal, displayText: `${ldzTotal} LDZ + ${solTotal} SOL` };
     if (ldzTotal > 0) return { isMixed: false, amount: ldzTotal, symbol: 'LDZ', displayText: `${ldzTotal} LDZ` };
@@ -130,9 +116,7 @@ export function TraitMarketplace() {
     return { isMixed: false, amount: 0, symbol: 'SOL', displayText: '0 SOL' };
   };
 
-  const handlePurchaseStart = () => {
-    if (Object.keys(selectedTraits).length > 0 && selectedNFT) setShowPurchaseFlow(true);
-  };
+  const handlePurchaseStart = () => { if (Object.keys(selectedTraits).length > 0 && selectedNFT) setShowPurchaseFlow(true); };
   const handlePurchaseSuccess = (txSig: string, imgUrl?: string) => {
     setPurchaseSuccess({ txSignature: txSig, updatedImageUrl: imgUrl || selectedNFT?.image || '' });
     setShowPurchaseFlow(false); setSelectedTraits({}); fetchData();
@@ -144,12 +128,8 @@ export function TraitMarketplace() {
     window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(txt)}`, '_blank');
   };
 
-  const scrollTabs = (dir: 'left' | 'right') => {
-    tabsRef.current?.scrollBy({ left: dir === 'left' ? -150 : 150, behavior: 'smooth' });
-  };
-  const scrollTraits = (dir: 'left' | 'right') => {
-    traitsRowRef.current?.scrollBy({ left: dir === 'left' ? -200 : 200, behavior: 'smooth' });
-  };
+  const scrollTabs = (dir: 'left' | 'right') => { tabsRef.current?.scrollBy({ left: dir === 'left' ? -150 : 150, behavior: 'smooth' }); };
+  const scrollTraits = (dir: 'left' | 'right') => { traitsRowRef.current?.scrollBy({ left: dir === 'left' ? -200 : 200, behavior: 'smooth' }); };
 
   const activeSlotTraits = activeSlotId ? getTraitsForSlot(activeSlotId) : [];
 
@@ -158,7 +138,7 @@ export function TraitMarketplace() {
       <div className="min-h-screen flex items-center justify-center" style={{ background: '#0a0a0f' }}>
         <div className="text-center">
           <div className="animate-spin rounded-full h-10 w-10 border-2 border-yellow-600 border-t-transparent mx-auto mb-3" />
-          <p className="text-yellow-600/70 font-cinzel text-sm tracking-widest uppercase">Loading the Forge...</p>
+          <p className="text-yellow-600/70 font-cinzel text-base tracking-widest uppercase">Loading the Forge...</p>
         </div>
       </div>
     );
@@ -168,8 +148,8 @@ export function TraitMarketplace() {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: '#0a0a0f' }}>
         <div className="text-center">
-          <p className="text-red-400 mb-4">{error}</p>
-          <button onClick={fetchData} className="text-yellow-500 hover:text-yellow-400 underline">Retry</button>
+          <p className="text-red-400 mb-4 text-base">{error}</p>
+          <button onClick={fetchData} className="text-yellow-500 hover:text-yellow-400 underline text-base">Retry</button>
         </div>
       </div>
     );
@@ -179,7 +159,7 @@ export function TraitMarketplace() {
     <div className="min-h-screen bg-cover bg-center bg-fixed" style={{ backgroundImage: "url('/bg.webp')", backgroundColor: '#0a0a0f' }}>
       <div className="min-h-screen" style={{ background: 'rgba(5, 5, 10, 0.75)' }}>
 
-        {/* ===== SUCCESS MODAL ===== */}
+        {/* SUCCESS MODAL */}
         {purchaseSuccess && (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
             <div className="forge-panel p-8 max-w-md w-full mx-4 text-center">
@@ -197,53 +177,43 @@ export function TraitMarketplace() {
           </div>
         )}
 
-        {/* ===== MAIN 2-COLUMN LAYOUT ===== */}
+        {/* MAIN 2-COLUMN LAYOUT */}
         <div className="flex flex-col lg:flex-row min-h-screen p-2 sm:p-3 gap-3">
 
-          {/* ========== LEFT COLUMN: Logo + NFTs ========== */}
+          {/* LEFT COLUMN: Logo + NFTs */}
           <div className="lg:w-[42%] flex flex-col gap-3 lg:h-screen lg:max-h-screen lg:sticky lg:top-0">
-
-            {/* Logo + Wallet */}
             <div className="flex flex-col items-center pt-2">
               <img src="/logo.webp" alt="Pepeverse Trait Forge" className="h-24 sm:h-32 lg:h-40 object-contain drop-shadow-2xl" />
-              <div className="mt-2">
-                <WalletMultiButton />
-              </div>
+              <div className="mt-2"><WalletMultiButton /></div>
             </div>
 
-            {/* SELECT YOUR CHAMPION */}
             <div className="forge-panel p-4 flex-1 flex flex-col min-h-0">
-              <h2 className="font-cinzel text-yellow-400 text-xs tracking-widest uppercase mb-3">
+              <h2 className="font-cinzel text-yellow-400 text-base sm:text-lg tracking-widest uppercase mb-3 text-center">
                 Select Your Champion
               </h2>
-
               {!connected ? (
                 <div className="flex-1 flex items-center justify-center">
                   <p className="text-gray-500 text-sm text-center">Connect wallet to view available NFTs to forge</p>
                 </div>
               ) : (
                 <div className="flex-1 overflow-y-auto">
-                  <NFTGallery
-                    collectionIds={collectionIds}
-                    onNFTSelect={handleNFTSelect}
-                    selectedNFT={selectedNFT || undefined}
-                  />
+                  <NFTGallery collectionIds={collectionIds} onNFTSelect={handleNFTSelect} selectedNFT={selectedNFT || undefined} />
                 </div>
               )}
             </div>
           </div>
 
-          {/* ========== RIGHT COLUMN: Traits (top) + Preview (bottom) ========== */}
+          {/* RIGHT COLUMN: Traits (top) + Preview (bottom) */}
           <div className="lg:w-[58%] flex flex-col gap-3 lg:h-screen lg:max-h-screen lg:sticky lg:top-0">
 
-            {/* ---- TOP: CHOOSE TRAIT TO FORGE ---- */}
-            <div className="forge-panel p-4 flex flex-col" style={{ minHeight: '280px' }}>
-              <h2 className="font-cinzel text-yellow-400 text-xs tracking-widest uppercase mb-3">
+            {/* TOP: CHOOSE TRAIT TO FORGE */}
+            <div className="forge-panel p-4 flex flex-col" style={{ minHeight: '300px' }}>
+              <h2 className="font-cinzel text-yellow-400 text-base sm:text-lg tracking-widest uppercase mb-3 text-center">
                 Choose Trait to Forge
               </h2>
 
               {duplicateWarning && (
-                <div className="mb-2 px-3 py-1.5 rounded text-xs flex items-center gap-2" style={{ background: 'rgba(234,179,8,0.1)', border: '1px solid rgba(234,179,8,0.3)', color: '#fbbf24' }}>
+                <div className="mb-2 px-3 py-2 rounded text-sm flex items-center gap-2" style={{ background: 'rgba(234,179,8,0.1)', border: '1px solid rgba(234,179,8,0.3)', color: '#fbbf24' }}>
                   ⚠️ {duplicateWarning}
                 </div>
               )}
@@ -252,17 +222,16 @@ export function TraitMarketplace() {
                 <div className="flex-1 flex items-center justify-center text-gray-500 text-sm">
                   {collectionIds.length === 0
                     ? <div className="text-center"><p>No collections configured</p><p className="text-xs mt-1 text-gray-600">Admin needs to configure collection IDs</p></div>
-                    : <p>Select a champion to view available traits</p>
-                  }
+                    : <p>Select a champion to view available traits</p>}
                 </div>
               ) : (
                 <>
                   {/* Category Tabs */}
-                  <div className="flex items-center gap-1 mb-3">
+                  <div className="flex items-center gap-1.5 mb-3">
                     <button onClick={() => scrollTabs('left')} className="scroll-arrow" aria-label="Scroll left">
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
                     </button>
-                    <div ref={tabsRef} className="flex-1 flex gap-1.5 overflow-x-auto" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                    <div ref={tabsRef} className="flex-1 flex gap-2 overflow-x-auto" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                       {slots.map(slot => {
                         if (getTraitsForSlot(slot.id).length === 0) return null;
                         return (
@@ -275,17 +244,17 @@ export function TraitMarketplace() {
                       })}
                     </div>
                     <button onClick={() => scrollTabs('right')} className="scroll-arrow" aria-label="Scroll right">
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                     </button>
                   </div>
 
-                  {/* Horizontal scrollable trait cards row */}
-                  <div className="flex items-center gap-1">
+                  {/* Horizontal scrollable trait cards */}
+                  <div className="flex items-center gap-1.5">
                     <button onClick={() => scrollTraits('left')} className="scroll-arrow" aria-label="Scroll traits left">
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
                     </button>
                     <div ref={traitsRowRef} className="flex-1 overflow-x-auto overflow-y-hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                      <div className="flex gap-2.5 pb-1">
+                      <div className="flex gap-3 pb-1">
                         {activeSlotTraits.map(trait => {
                           const isSelected = activeSlotId ? selectedTraits[activeSlotId]?.id === trait.id : false;
                           const isAvailable = !trait.totalSupply || (trait.remainingSupply && trait.remainingSupply > 0);
@@ -295,34 +264,34 @@ export function TraitMarketplace() {
                           return (
                             <div key={trait.id}
                               className={`trait-card flex-shrink-0 ${rarityClass} ${isSelected ? 'rarity-selected' : ''} ${!isAvailable ? 'opacity-40 cursor-not-allowed' : ''}`}
-                              style={{ width: '130px' }}
+                              style={{ width: '150px' }}
                               onClick={() => isAvailable && activeSlotId && handleTraitSelect(activeSlotId, isSelected ? null : trait)}
                             >
                               <div className="aspect-square bg-black/30 overflow-hidden relative">
                                 <img src={trait.imageLayerUrl} alt={trait.name} className="w-full h-full object-cover" />
-                                <span className={`absolute top-1 left-1 text-[8px] font-semibold px-1 py-0.5 rounded border ${badgeColor}`}>
+                                <span className={`absolute top-1.5 left-1.5 text-[10px] font-semibold px-1.5 py-0.5 rounded border ${badgeColor}`}>
                                   {trait.rarityTier.name}
                                 </span>
                                 {isSelected && (
-                                  <div className="absolute top-1 right-1 w-4 h-4 rounded-full flex items-center justify-center text-[9px]" style={{ background: 'rgba(201,168,76,0.9)', color: '#0a0a0f' }}>✓</div>
+                                  <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full flex items-center justify-center text-[10px]" style={{ background: 'rgba(201,168,76,0.9)', color: '#0a0a0f' }}>✓</div>
                                 )}
                                 {!isAvailable && (
                                   <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                                    <span className="text-red-400 text-[10px] font-semibold">Sold Out</span>
+                                    <span className="text-red-400 text-xs font-semibold">Sold Out</span>
                                   </div>
                                 )}
                               </div>
-                              <div className="p-1.5">
-                                <div className="text-[11px] font-medium text-gray-200 truncate">{trait.name}</div>
-                                <div className="flex justify-between items-center mt-0.5">
-                                  <span className="text-[10px] text-gray-400">Pricing</span>
-                                  <span className="text-[10px] text-gray-400">Stock</span>
+                              <div className="p-2">
+                                <div className="text-sm font-medium text-gray-200 truncate">{trait.name}</div>
+                                <div className="flex justify-between items-center mt-1">
+                                  <span className="text-xs text-gray-400">Pricing</span>
+                                  <span className="text-xs text-gray-400">Stock</span>
                                 </div>
                                 <div className="flex justify-between items-center">
-                                  <span className="text-[10px] text-yellow-400 font-semibold">
-                                    ◆ {formatDecimalPrice(trait.priceAmount.toString())}
+                                  <span className="text-xs text-yellow-400 font-semibold">
+                                    ◆ {formatDecimalPrice(trait.priceAmount.toString())} {trait.priceToken.symbol}
                                   </span>
-                                  <span className="text-[10px] text-gray-300">
+                                  <span className="text-xs text-gray-300">
                                     {trait.totalSupply ? `${trait.remainingSupply}` : '∞'}
                                   </span>
                                 </div>
@@ -336,16 +305,16 @@ export function TraitMarketplace() {
                       </div>
                     </div>
                     <button onClick={() => scrollTraits('right')} className="scroll-arrow" aria-label="Scroll traits right">
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                     </button>
                   </div>
                 </>
               )}
             </div>
 
-            {/* ---- BOTTOM: WITNESS THE TRANSFORMATION ---- */}
+            {/* BOTTOM: WITNESS THE TRANSFORMATION */}
             <div className="forge-panel p-4 flex-1 flex flex-col min-h-0">
-              <h2 className="font-cinzel text-yellow-400 text-xs tracking-widest uppercase mb-3">
+              <h2 className="font-cinzel text-yellow-400 text-base sm:text-lg tracking-widest uppercase mb-3 text-center">
                 Witness the Transformation
               </h2>
 
@@ -353,68 +322,64 @@ export function TraitMarketplace() {
                 <div className="flex-1 flex items-center justify-center text-gray-500 text-sm">
                   {collectionIds.length === 0
                     ? <div className="text-center"><p>No collections configured</p><p className="text-xs mt-1 text-gray-600">Admin needs to configure collection IDs</p></div>
-                    : <p>Select a champion to see preview</p>
-                  }
+                    : <p>Select a champion to see preview</p>}
                 </div>
               ) : (
                 <div className="flex-1 flex flex-col lg:flex-row gap-4 overflow-y-auto">
-                  {/* Original + With Traits side by side */}
+                  {/* Original + Forged side by side */}
                   <div className="flex gap-3 flex-shrink-0">
-                    {/* Original */}
-                    <div className="w-36 lg:w-44">
-                      <h4 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Original</h4>
+                    <div className="w-40 lg:w-48">
+                      <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Original</h4>
                       <div className="aspect-square rounded-lg overflow-hidden" style={{ border: '1px solid rgba(201,168,76,0.2)' }}>
                         <img src={selectedNFT.image} alt={selectedNFT.name} className="w-full h-full object-cover" />
                       </div>
-                      <p className="text-[10px] text-gray-500 mt-1 text-center truncate">{selectedNFT.name}</p>
+                      <p className="text-xs text-gray-500 mt-1 text-center truncate">{selectedNFT.name}</p>
                     </div>
-                    {/* With Traits */}
-                    <div className="w-36 lg:w-44">
-                      <h4 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">With Traits</h4>
+                    <div className="w-40 lg:w-48">
+                      <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Forged</h4>
                       <div style={{ border: '1px solid rgba(201,168,76,0.2)', borderRadius: '0.5rem', overflow: 'hidden' }}>
                         <LivePreview baseNFT={selectedNFT} selectedTraits={selectedTraits} slots={slots} />
                       </div>
-                      <p className="text-[10px] text-gray-500 mt-1 text-center">With Traits</p>
+                      <p className="text-xs text-gray-500 mt-1 text-center">Forged</p>
                     </div>
                   </div>
 
                   {/* Changes + Pricing + Button */}
                   <div className="flex-1 flex flex-col min-w-0">
-                    {/* Changes list */}
                     {getTraitChanges().length > 0 && (
                       <div className="mb-3">
-                        <h4 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Changes</h4>
-                        <div className="space-y-1">
+                        <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Changes</h4>
+                        <div className="space-y-1.5">
                           {getTraitChanges().map((change, i) => (
-                            <div key={i} className="flex justify-between text-xs">
-                              <span className="text-gray-300">{change.slotName}</span>
-                              <span className="text-green-400 font-medium">+{formatDecimalPrice(change.newTrait.priceAmount.toString())}</span>
+                            <div key={i} className="text-sm flex items-center gap-2">
+                              <span className="text-yellow-400/80 font-medium">{change.slotName}:</span>
+                              <span className="text-gray-500 line-through">{change.oldTrait}</span>
+                              <span className="text-gray-600">→</span>
+                              <span className="text-green-400 font-medium">{change.newTrait.name}</span>
                             </div>
                           ))}
                         </div>
                       </div>
                     )}
 
-                    {/* Total */}
                     {Object.keys(selectedTraits).length > 0 && (
                       <div className="pt-2 mb-3" style={{ borderTop: '1px solid rgba(201,168,76,0.1)' }}>
                         <div className="flex justify-between items-center">
-                          <span className="text-xs text-gray-300 font-medium">Total</span>
-                          <span className="text-sm font-cinzel font-bold text-yellow-400">
-                            ◆ {getTotalPrice().displayText}
+                          <span className="text-sm text-gray-300 font-cinzel font-semibold uppercase tracking-wider">Forge Cost</span>
+                          <span className="text-base font-cinzel font-bold text-yellow-400">
+                            {getTotalPrice().displayText}
                           </span>
                         </div>
                       </div>
                     )}
 
-                    {/* Forge Button */}
                     <div className="mt-auto">
                       {Object.keys(selectedTraits).length > 0 ? (
-                        <button onClick={handlePurchaseStart} className="forge-button text-sm">
+                        <button onClick={handlePurchaseStart} className="forge-button">
                           FORGE UPGRADE — {getTotalPrice().displayText}
                         </button>
                       ) : (
-                        <div className="text-center text-gray-600 py-3 text-xs">
+                        <div className="text-center text-gray-600 py-3 text-sm">
                           Select traits to begin forging
                         </div>
                       )}
@@ -427,14 +392,8 @@ export function TraitMarketplace() {
         </div>
       </div>
 
-      {/* Purchase Flow Modal */}
       {showPurchaseFlow && selectedNFT && Object.keys(selectedTraits).length > 0 && (
-        <EnhancedPurchaseFlow
-          selectedNFT={selectedNFT}
-          selectedTraits={selectedTraits}
-          onSuccess={handlePurchaseSuccess}
-          onCancel={handlePurchaseCancel}
-        />
+        <EnhancedPurchaseFlow selectedNFT={selectedNFT} selectedTraits={selectedTraits} onSuccess={handlePurchaseSuccess} onCancel={handlePurchaseCancel} />
       )}
     </div>
   );

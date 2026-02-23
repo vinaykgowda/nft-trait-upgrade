@@ -156,8 +156,8 @@ body {
 
 /* ===== Category tab styling ===== */
 .category-tab {
-  padding: 0.4rem 1rem;
-  font-size: 0.75rem;
+  padding: 0.5rem 1.2rem;
+  font-size: 0.85rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;

@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
-import { CoreAsset, Trait, TraitSlot, Project } from '@/types';
+import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
+import { CoreAsset, Trait, TraitSlot } from '@/types';
 import { TraitSelection } from '@/lib/services/preview';
 import { formatDecimalPrice } from '@/lib/utils';
 import { NFTGallery } from '../nft/NFTGallery';
@@ -15,6 +16,26 @@ interface TraitChange {
   newTrait: Trait;
 }
 
+function getRarityClass(rarityName: string): string {
+  switch (rarityName.toLowerCase()) {
+    case 'mythic': return 'rarity-mythic';
+    case 'legendary': return 'rarity-legendary';
+    case 'rare': return 'rarity-rare';
+    case 'uncommon': return 'rarity-uncommon';
+    default: return 'rarity-common';
+  }
+}
+
+function getRarityBadgeColor(rarityName: string): string {
+  switch (rarityName.toLowerCase()) {
+    case 'mythic': return 'bg-purple-500/20 text-purple-300 border-purple-500/40';
+    case 'legendary': return 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40';
+    case 'rare': return 'bg-blue-500/20 text-blue-300 border-blue-500/40';
+    case 'uncommon': return 'bg-green-500/20 text-green-300 border-green-500/40';
+    default: return 'bg-gray-500/20 text-gray-300 border-gray-500/40';
+  }
+}
+
 export function TraitMarketplace() {
   const { connected } = useWallet();
   const [selectedNFT, setSelectedNFT] = useState<CoreAsset | null>(null);
@@ -25,24 +46,28 @@ export function TraitMarketplace() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
   const [showPurchaseFlow, setShowPurchaseFlow] = useState(false);
-  const [expandedSlots, setExpandedSlots] = useState<Record<string, boolean>>({});
   const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
+  const [activeSlotId, setActiveSlotId] = useState<string | null>(null);
   const [purchaseSuccess, setPurchaseSuccess] = useState<{
     txSignature: string;
     updatedImageUrl: string;
   } | null>(null);
 
+  const tabsContainerRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
-    if (connected) {
-      fetchData();
+    fetchData();
+  }, []);
+
+  useEffect(() => {
+    if (slots.length > 0 && !activeSlotId) {
+      setActiveSlotId(slots[0].id);
     }
-  }, [connected]);
+  }, [slots, activeSlotId]);
 
   const fetchData = async () => {
     try {
       setLoading(true);
-      
-      // Fetch project config, traits and slots in parallel
       const [projectResponse, traitsResponse, slotsResponse] = await Promise.all([
         fetch('/api/project'),
         fetch('/api/traits?active=1'),
@@ -59,10 +84,8 @@ export function TraitMarketplace() {
         slotsResponse.json()
       ]);
 
-      // Handle project data (might be wrapped in API response format)
       const projectData = projectResult.data || projectResult;
       setCollectionIds(projectData.collectionIds || []);
-      
       setTraits(traitsResult.data || []);
       setSlots(slotsResult.data || []);
     } catch (err) {
@@ -80,7 +103,6 @@ export function TraitMarketplace() {
   };
 
   const handleTraitSelect = (slotId: string, trait: Trait | null) => {
-    // Check if the NFT already has this exact trait
     if (trait && selectedNFT?.attributes) {
       const slot = slots.find(s => s.id === slotId);
       const slotName = slot?.name || '';
@@ -88,7 +110,7 @@ export function TraitMarketplace() {
         attr => attr.trait_type?.toLowerCase() === slotName.toLowerCase()
       );
       if (currentAttribute && currentAttribute.value?.toLowerCase() === trait.name.toLowerCase()) {
-        setDuplicateWarning(`Your NFT already has "${trait.name}" as its ${slotName}. Pick a different one to upgrade!`);
+        setDuplicateWarning(`Your NFT already has "${trait.name}" as its ${slotName}. Pick a different one!`);
         setTimeout(() => setDuplicateWarning(null), 4000);
         return;
       }
@@ -111,75 +133,33 @@ export function TraitMarketplace() {
 
   const getTraitChanges = (): TraitChange[] => {
     if (!selectedNFT) return [];
-    
     return Object.entries(selectedTraits).map(([slotId, newTrait]) => {
       const slot = slots.find(s => s.id === slotId);
       const slotName = slot?.name || 'Unknown';
-      
-      // Get current trait from NFT attributes
       const currentAttribute = selectedNFT.attributes?.find(
         attr => attr.trait_type?.toLowerCase() === slotName.toLowerCase()
       );
-      
-      return {
-        slotName,
-        oldTrait: currentAttribute?.value || 'None',
-        newTrait
-      };
+      return { slotName, oldTrait: currentAttribute?.value || 'None', newTrait };
     });
   };
 
   const getTotalPrice = () => {
-    const traits = Object.values(selectedTraits);
-    
-    // Calculate totals by token type
+    const traitValues = Object.values(selectedTraits);
     let solTotal = 0;
     let ldzTotal = 0;
-    
-    traits.forEach(trait => {
+    traitValues.forEach(trait => {
       const amount = Number(trait.priceAmount);
-      
-      if (trait.priceToken.symbol === 'SOL') {
-        solTotal += amount;
-      } else if (trait.priceToken.symbol === 'LDZ') {
-        ldzTotal += amount;
-      }
+      if (trait.priceToken.symbol === 'SOL') solTotal += amount;
+      else if (trait.priceToken.symbol === 'LDZ') ldzTotal += amount;
     });
-
-    // Return appropriate display based on what tokens are present
     if (solTotal > 0 && ldzTotal > 0) {
-      // Mixed payment - return both amounts separately
-      return {
-        isMixed: true,
-        ldzAmount: ldzTotal,
-        solAmount: solTotal,
-        displayText: `${ldzTotal} LDZ + ${solTotal} SOL`
-      };
+      return { isMixed: true, ldzAmount: ldzTotal, solAmount: solTotal, displayText: `${ldzTotal} LDZ + ${solTotal} SOL` };
     } else if (ldzTotal > 0) {
-      // LDZ only
-      return {
-        isMixed: false,
-        amount: ldzTotal,
-        symbol: 'LDZ',
-        displayText: `${ldzTotal} LDZ`
-      };
+      return { isMixed: false, amount: ldzTotal, symbol: 'LDZ', displayText: `${ldzTotal} LDZ` };
     } else if (solTotal > 0) {
-      // SOL only
-      return {
-        isMixed: false,
-        amount: solTotal,
-        symbol: 'SOL',
-        displayText: `${solTotal} SOL`
-      };
-    } else {
-      // No traits selected
-      return {
-        isMixed: false,
-        amount: 0,
-        symbol: 'SOL',
-        displayText: '0 SOL'
-      };
+      return { isMixed: false, amount: solTotal, symbol: 'SOL', displayText: `${solTotal} SOL` };
     }
+    return { isMixed: false, amount: 0, symbol: 'SOL', displayText: '0 SOL' };
   };
 
   const handlePurchaseStart = () => {
@@ -188,118 +168,84 @@ export function TraitMarketplace() {
     }
   };
 
-  const toggleSlotExpanded = (slotId: string) => {
-    setExpandedSlots(prev => ({
-      ...prev,
-      [slotId]: !prev[slotId]
-    }));
-  };
-
   const handlePurchaseSuccess = (txSignature: string, updatedImageUrl?: string) => {
-    setPurchaseSuccess({
-      txSignature,
-      updatedImageUrl: updatedImageUrl || selectedNFT?.image || ''
-    });
+    setPurchaseSuccess({ txSignature, updatedImageUrl: updatedImageUrl || selectedNFT?.image || '' });
     setShowPurchaseFlow(false);
     setSelectedTraits({});
-    // Refresh traits to update remaining supply counts
     fetchData();
   };
 
-  const handlePurchaseCancel = () => {
-    setShowPurchaseFlow(false);
-  };
+  const handlePurchaseCancel = () => { setShowPurchaseFlow(false); };
 
   const handleTweet = () => {
     if (!purchaseSuccess || !selectedNFT) return;
-    
-    const tweetText = `Just updated my ${selectedNFT.name} NFT with new traits using Pepeverse Trait Store! 🎨✨ Check it out: https://magiceden.io/item-details/${selectedNFT.address}`;
-    const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
-    window.open(tweetUrl, '_blank');
+    const tweetText = `Just forged my ${selectedNFT.name} NFT with new traits using Pepeverse Trait Forge! 🔥⚔️ Check it out: https://magiceden.io/item-details/${selectedNFT.address}`;
+    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`, '_blank');
   };
 
-  if (!connected) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">
-            Connect Your Wallet
-          </h2>
-          <p className="text-gray-600">
-            Connect your Solana wallet to access the trait marketplace
-          </p>
-        </div>
-      </div>
-    );
-  }
+  const scrollTabs = (direction: 'left' | 'right') => {
+    if (tabsContainerRef.current) {
+      const scrollAmount = 150;
+      tabsContainerRef.current.scrollBy({
+        left: direction === 'left' ? -scrollAmount : scrollAmount,
+        behavior: 'smooth'
+      });
+    }
+  };
+
+  // Active slot traits
+  const activeSlotTraits = activeSlotId ? getTraitsForSlot(activeSlotId) : [];
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: '#0a0a0f' }}>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-10 w-10 border-2 border-yellow-600 border-t-transparent mx-auto mb-3"></div>
+          <p className="text-yellow-600/70 font-cinzel text-sm tracking-widest uppercase">Loading the Forge...</p>
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center" style={{ background: '#0a0a0f' }}>
         <div className="text-center">
-          <p className="text-red-600 mb-4">{error}</p>
-          <button
-            onClick={fetchData}
-            className="text-blue-600 hover:text-blue-700"
-          >
-            Retry
-          </button>
+          <p className="text-red-400 mb-4">{error}</p>
+          <button onClick={fetchData} className="text-yellow-500 hover:text-yellow-400 underline">Retry</button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="px-1 sm:px-2 py-4">
+    <div
+      className="min-h-screen bg-cover bg-center bg-fixed"
+      style={{ backgroundImage: "url('/bg.webp')", backgroundColor: '#0a0a0f' }}
+    >
+      {/* Dark overlay */}
+      <div className="min-h-screen" style={{ background: 'rgba(5, 5, 10, 0.75)' }}>
+
         {/* Success Modal */}
         {purchaseSuccess && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4">
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="forge-panel p-8 max-w-md w-full mx-4">
               <div className="text-center">
-                <div className="mb-6">
-                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">
-                    NFT Updated Successfully!
-                  </h3>
-                  <p className="text-gray-600 text-sm mb-4">
-                    Your NFT has been updated with new traits and metadata
-                  </p>
+                <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: 'rgba(34, 197, 94, 0.15)', border: '1px solid rgba(34, 197, 94, 0.4)' }}>
+                  <svg className="w-8 h-8 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
                 </div>
-
-                {/* Updated NFT Image */}
+                <h3 className="text-xl font-cinzel text-yellow-400 mb-2">Forge Complete!</h3>
+                <p className="text-gray-400 text-sm mb-4">Your champion has been transformed</p>
                 <div className="mb-6">
-                  <img
-                    src={purchaseSuccess.updatedImageUrl}
-                    alt="Updated NFT"
-                    className="w-48 h-48 object-cover rounded-lg mx-auto border-2 border-green-200"
-                  />
+                  <img src={purchaseSuccess.updatedImageUrl} alt="Updated NFT" className="w-48 h-48 object-cover rounded-lg mx-auto border border-yellow-600/30" />
                 </div>
-
-                {/* Action Buttons */}
                 <div className="flex space-x-3">
-                  <button
-                    onClick={handleTweet}
-                    className="flex-1 bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 transition-colors"
-                  >
+                  <button onClick={handleTweet} className="flex-1 py-2 px-4 rounded-lg text-sm font-medium" style={{ background: 'rgba(59, 130, 246, 0.2)', border: '1px solid rgba(59, 130, 246, 0.4)', color: '#93c5fd' }}>
                     Tweet About It
                   </button>
-                  <button
-                    onClick={() => setPurchaseSuccess(null)}
-                    className="flex-1 bg-gray-200 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors"
-                  >
+                  <button onClick={() => setPurchaseSuccess(null)} className="flex-1 py-2 px-4 rounded-lg text-sm font-medium" style={{ background: 'rgba(156, 163, 175, 0.1)', border: '1px solid rgba(156, 163, 175, 0.3)', color: '#9ca3af' }}>
                     Close
                   </button>
                 </div>
@@ -308,262 +254,249 @@ export function TraitMarketplace() {
           </div>
         )}
 
-        {/* 3-Column Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:h-screen lg:max-h-screen">
-          
-          {/* Left Column - NFT Gallery */}
-          <div className="bg-white rounded-lg shadow-sm p-6 lg:overflow-hidden flex flex-col">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              Your NFTs
-            </h2>
-            <div className="flex-1 lg:overflow-y-auto">
-              <NFTGallery
-                collectionIds={collectionIds}
-                onNFTSelect={handleNFTSelect}
-                selectedNFT={selectedNFT || undefined}
-              />
+        {/* ===== HEADER: Logo + Wallet ===== */}
+        <div className="flex flex-col items-center pt-6 pb-2 px-4">
+          <img src="/logo.webp" alt="Pepeverse Trait Forge" className="h-28 sm:h-36 object-contain mb-3 drop-shadow-2xl" />
+          {!connected && (
+            <div className="mt-2">
+              <WalletMultiButton />
             </div>
-          </div>
+          )}
+          {connected && (
+            <div className="mt-1">
+              <WalletMultiButton />
+            </div>
+          )}
+        </div>
 
-          {/* Center Column - Available Traits */}
-          <div className="bg-white rounded-lg shadow-sm p-6 lg:overflow-hidden flex flex-col">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              Available Traits
-            </h2>
+        {/* ===== MAIN 3-COLUMN LAYOUT ===== */}
+        <div className="px-2 sm:px-4 pb-6 pt-2">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:h-[calc(100vh-220px)]">
 
-            {duplicateWarning && (
-              <div className="mb-3 px-3 py-2 bg-amber-50 border border-amber-300 rounded-lg text-sm text-amber-800 flex items-center gap-2">
-                <span>⚠️</span>
-                <span>{duplicateWarning}</span>
-              </div>
-            )}
-            
-            {!selectedNFT ? (
-              <div className="flex-1 flex items-center justify-center text-gray-500">
-                {collectionIds.length === 0 ? (
+            {/* ===== LEFT: SELECT YOUR CHAMPION ===== */}
+            <div className="lg:col-span-4 forge-panel p-4 flex flex-col lg:overflow-hidden">
+              <h2 className="font-cinzel text-yellow-400 text-sm tracking-widest uppercase mb-3 flex items-center gap-2">
+                <span className="text-lg">⚔️</span> Select Your Champion
+              </h2>
+
+              {!connected ? (
+                <div className="flex-1 flex items-center justify-center">
                   <div className="text-center">
-                    <p>No collections configured</p>
-                    <p className="text-sm mt-2">Admin needs to configure collection IDs</p>
+                    <p className="text-gray-500 text-sm mb-2">Connect wallet to view available NFTs to forge</p>
                   </div>
-                ) : (
-                  <p>Select an NFT to view available traits</p>
-                )}
-              </div>
-            ) : (
-              <div className="flex-1 lg:overflow-y-auto space-y-2">
-                {slots.map(slot => {
-                  const slotTraits = getTraitsForSlot(slot.id);
-                  if (slotTraits.length === 0) return null;
-                  const isExpanded = expandedSlots[slot.id] ?? false;
+                </div>
+              ) : (
+                <div className="flex-1 lg:overflow-y-auto">
+                  <NFTGallery
+                    collectionIds={collectionIds}
+                    onNFTSelect={handleNFTSelect}
+                    selectedNFT={selectedNFT || undefined}
+                  />
+                </div>
+              )}
+            </div>
 
-                  return (
-                    <div key={slot.id} className="border rounded-lg overflow-hidden">
-                      <button
-                        onClick={() => toggleSlotExpanded(slot.id)}
-                        className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors"
-                      >
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-medium text-gray-900">
-                            {slot.name}
-                          </h3>
-                          <span className="text-xs text-gray-500">({slotTraits.length})</span>
-                          {selectedTraits[slot.id] && (
-                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
-                              {selectedTraits[slot.id].name}
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {selectedTraits[slot.id] && (
-                            <span
-                              onClick={(e) => { e.stopPropagation(); handleTraitSelect(slot.id, null); }}
-                              className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded hover:bg-red-200 cursor-pointer"
-                            >
-                              Remove
-                            </span>
-                          )}
-                          <svg
-                            className={`w-5 h-5 text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
+            {/* ===== CENTER: CHOOSE TRAIT TO FORGE ===== */}
+            <div className="lg:col-span-4 forge-panel p-4 flex flex-col lg:overflow-hidden">
+              <h2 className="font-cinzel text-yellow-400 text-sm tracking-widest uppercase mb-3 flex items-center gap-2">
+                <span className="text-lg">🔮</span> Choose Trait to Forge
+              </h2>
+
+              {duplicateWarning && (
+                <div className="mb-3 px-3 py-2 rounded-lg text-sm flex items-center gap-2" style={{ background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.3)', color: '#fbbf24' }}>
+                  <span>⚠️</span>
+                  <span>{duplicateWarning}</span>
+                </div>
+              )}
+
+              {!selectedNFT ? (
+                <div className="flex-1 flex items-center justify-center text-gray-500 text-sm">
+                  {collectionIds.length === 0 ? (
+                    <div className="text-center">
+                      <p>No collections configured</p>
+                      <p className="text-xs mt-2 text-gray-600">Admin needs to configure collection IDs</p>
+                    </div>
+                  ) : (
+                    <p>Select a champion to view available traits</p>
+                  )}
+                </div>
+              ) : (
+                <div className="flex flex-col flex-1 min-h-0">
+                  {/* Category Tabs with scroll arrows */}
+                  <div className="flex items-center gap-1 mb-3">
+                    <button onClick={() => scrollTabs('left')} className="scroll-arrow" aria-label="Scroll categories left">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                    </button>
+                    <div ref={tabsContainerRef} className="flex-1 flex gap-1.5 overflow-x-auto scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                      {slots.map(slot => {
+                        const count = getTraitsForSlot(slot.id).length;
+                        if (count === 0) return null;
+                        return (
+                          <button
+                            key={slot.id}
+                            onClick={() => setActiveSlotId(slot.id)}
+                            className={`category-tab ${activeSlotId === slot.id ? 'active' : ''}`}
                           >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </div>
-                      </button>
-                      
-                      {isExpanded && (
-                        <div className="p-3">
-                          <div className="grid grid-cols-3 gap-2">
-                            {slotTraits.map(trait => {
-                              const isSelected = selectedTraits[slot.id]?.id === trait.id;
-                              const isAvailable = !trait.totalSupply || (trait.remainingSupply && trait.remainingSupply > 0);
-                              
-                              return (
-                                <div
-                                  key={trait.id}
-                                  className={`relative border rounded-lg p-2 cursor-pointer transition-all ${
-                                    isSelected
-                                      ? 'border-blue-500 bg-blue-50'
-                                      : isAvailable
-                                      ? 'border-gray-200 hover:border-gray-300'
-                                      : 'border-gray-100 opacity-50 cursor-not-allowed'
-                                  }`}
-                                  onClick={() => isAvailable && handleTraitSelect(slot.id, trait)}
-                                >
-                                  <div className="aspect-square mb-2 bg-gray-100 rounded overflow-hidden">
-                                    <img
-                                      src={trait.imageLayerUrl}
-                                      alt={trait.name}
-                                      className="w-full h-full object-cover"
-                                    />
-                                  </div>
-                                  
-                                  <div className="text-xs">
-                                    <div className="font-medium text-gray-900 truncate">
-                                      {trait.name}
-                                    </div>
-                                    <div className="text-gray-500">
-                                      {trait.rarityTier.name}
-                                    </div>
-                                    <div className="text-gray-900 font-medium">
-                                      {formatDecimalPrice(trait.priceAmount.toString())} {trait.priceToken.symbol}
-                                    </div>
-                                    {trait.totalSupply && (
-                                      <div className="text-gray-500">
-                                        {trait.remainingSupply}/{trait.totalSupply} left
-                                      </div>
-                                    )}
-                                  </div>
-                                  
-                                  {isSelected && (
-                                    <div className="absolute top-1 right-1 bg-blue-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs">
-                                      ✓
-                                    </div>
-                                  )}
-                                  
-                                  {!isAvailable && (
-                                    <div className="absolute inset-0 bg-gray-500 bg-opacity-50 rounded-lg flex items-center justify-center">
-                                      <span className="text-white text-xs font-medium">Sold Out</span>
-                                    </div>
-                                  )}
+                            {slot.name}
+                            {selectedTraits[slot.id] && (
+                              <span className="ml-1 inline-block w-1.5 h-1.5 rounded-full bg-yellow-400"></span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <button onClick={() => scrollTabs('right')} className="scroll-arrow" aria-label="Scroll categories right">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                    </button>
+                  </div>
+
+                  {/* Traits Grid - scrollable */}
+                  <div className="flex-1 overflow-y-auto pr-1">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                      {activeSlotTraits.map(trait => {
+                        const isSelected = activeSlotId ? selectedTraits[activeSlotId]?.id === trait.id : false;
+                        const isAvailable = !trait.totalSupply || (trait.remainingSupply && trait.remainingSupply > 0);
+                        const rarityClass = getRarityClass(trait.rarityTier.name);
+                        const badgeColor = getRarityBadgeColor(trait.rarityTier.name);
+
+                        return (
+                          <div
+                            key={trait.id}
+                            className={`trait-card ${rarityClass} ${isSelected ? 'rarity-selected' : ''} ${!isAvailable ? 'opacity-40 cursor-not-allowed' : ''}`}
+                            onClick={() => isAvailable && activeSlotId && handleTraitSelect(activeSlotId, isSelected ? null : trait)}
+                          >
+                            <div className="aspect-square bg-black/30 overflow-hidden relative">
+                              <img src={trait.imageLayerUrl} alt={trait.name} className="w-full h-full object-cover" />
+                              {/* Rarity badge */}
+                              <span className={`absolute top-1 left-1 text-[9px] font-semibold px-1.5 py-0.5 rounded border ${badgeColor}`}>
+                                {trait.rarityTier.name}
+                              </span>
+                              {isSelected && (
+                                <div className="absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center text-[10px]" style={{ background: 'rgba(201, 168, 76, 0.9)', color: '#0a0a0f' }}>✓</div>
+                              )}
+                              {!isAvailable && (
+                                <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                                  <span className="text-red-400 text-xs font-semibold">Sold Out</span>
                                 </div>
-                              );
-                            })}
+                              )}
+                            </div>
+                            <div className="p-2">
+                              <div className="text-xs font-medium text-gray-200 truncate">{trait.name}</div>
+                              <div className="flex items-center justify-between mt-1">
+                                <span className="text-[10px] text-yellow-400 font-semibold">
+                                  {formatDecimalPrice(trait.priceAmount.toString())} {trait.priceToken.symbol}
+                                </span>
+                                {trait.totalSupply && (
+                                  <span className="text-[10px] text-gray-500">
+                                    {trait.remainingSupply}/{trait.totalSupply}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
                           </div>
+                        );
+                      })}
+                      {activeSlotTraits.length === 0 && (
+                        <div className="col-span-full text-center py-8 text-gray-500 text-sm">
+                          No traits available for this category
                         </div>
                       )}
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Right Column - Preview & Purchase */}
-          <div className="bg-white rounded-lg shadow-sm p-6 flex flex-col">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              Preview & Purchase
-            </h2>
-            
-            {!selectedNFT ? (
-              <div className="flex-1 flex items-center justify-center text-gray-500">
-                {collectionIds.length === 0 ? (
-                  <div className="text-center">
-                    <p>No collections configured</p>
-                    <p className="text-sm mt-2">Admin needs to configure collection IDs</p>
-                  </div>
-                ) : (
-                  <p>Select an NFT to see preview</p>
-                )}
-              </div>
-            ) : (
-              <div className="flex-1 flex flex-col space-y-4">
-                {/* Preview Images */}
-                <div className="grid grid-cols-2 gap-4">
-                  {/* Original */}
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-700 mb-2">Original</h4>
-                    <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
-                      <img
-                        src={selectedNFT.image}
-                        alt={selectedNFT.name}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  </div>
-
-                  {/* With Traits */}
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-700 mb-2">With Traits</h4>
-                    <LivePreview
-                      baseNFT={selectedNFT}
-                      selectedTraits={selectedTraits}
-                      slots={slots}
-                    />
                   </div>
                 </div>
+              )}
+            </div>
 
-                {/* Trait Changes */}
-                {getTraitChanges().length > 0 && (
-                  <div className="border-t pt-4">
-                    <h4 className="text-sm font-medium text-gray-700 mb-2">Changes</h4>
-                    <div className="space-y-2">
-                      {getTraitChanges().map((change, index) => (
-                        <div key={index} className="text-sm">
-                          <span className="font-medium">{change.slotName}:</span>
-                          <div className="ml-2 text-gray-600">
-                            <span className="line-through">{change.oldTrait}</span>
-                            <span className="mx-2">→</span>
-                            <span className="text-green-600 font-medium">{change.newTrait.name}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+            {/* ===== RIGHT: WITNESS THE TRANSFORMATION ===== */}
+            <div className="lg:col-span-4 forge-panel p-4 flex flex-col lg:overflow-hidden">
+              <h2 className="font-cinzel text-yellow-400 text-sm tracking-widest uppercase mb-3 flex items-center gap-2">
+                <span className="text-lg">🔥</span> Witness the Transformation
+              </h2>
 
-                {/* Pricing */}
-                {Object.keys(selectedTraits).length > 0 && (
-                  <div className="border-t pt-4">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm font-medium text-gray-700">
-                        Total ({Object.keys(selectedTraits).length} trait{Object.keys(selectedTraits).length > 1 ? 's' : ''})
-                      </span>
-                      <span className="text-lg font-bold text-gray-900">
-                        {getTotalPrice().displayText}
-                      </span>
+              {!selectedNFT ? (
+                <div className="flex-1 flex items-center justify-center text-gray-500 text-sm">
+                  {collectionIds.length === 0 ? (
+                    <div className="text-center">
+                      <p>No collections configured</p>
+                      <p className="text-xs mt-2 text-gray-600">Admin needs to configure collection IDs</p>
                     </div>
-                    
-                    <div className="space-y-1">
-                      {Object.values(selectedTraits).map(trait => (
-                        <div key={trait.id} className="flex justify-between text-xs text-gray-600">
-                          <span>{trait.name}</span>
-                          <span>{formatDecimalPrice(trait.priceAmount.toString())} {trait.priceToken.symbol}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Purchase Button */}
-                <div className="mt-auto pt-4">
-                  {Object.keys(selectedTraits).length > 0 ? (
-                    <button
-                      onClick={handlePurchaseStart}
-                      className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors"
-                    >
-                      Update NFT - {getTotalPrice().displayText}
-                    </button>
                   ) : (
-                    <div className="text-center text-gray-500 py-8">
-                      <p>Select traits to see pricing</p>
-                    </div>
+                    <p>Select a champion to see preview</p>
                   )}
                 </div>
-              </div>
-            )}
+              ) : (
+                <div className="flex-1 flex flex-col space-y-3 lg:overflow-y-auto">
+                  {/* Preview Images */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <h4 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Original</h4>
+                      <div className="aspect-square rounded-lg overflow-hidden" style={{ border: '1px solid rgba(201, 168, 76, 0.2)' }}>
+                        <img src={selectedNFT.image} alt={selectedNFT.name} className="w-full h-full object-cover" />
+                      </div>
+                    </div>
+                    <div>
+                      <h4 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">With Traits</h4>
+                      <div style={{ border: '1px solid rgba(201, 168, 76, 0.2)', borderRadius: '0.5rem', overflow: 'hidden' }}>
+                        <LivePreview baseNFT={selectedNFT} selectedTraits={selectedTraits} slots={slots} />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Trait Changes */}
+                  {getTraitChanges().length > 0 && (
+                    <div className="pt-2" style={{ borderTop: '1px solid rgba(201, 168, 76, 0.1)' }}>
+                      <h4 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Changes</h4>
+                      <div className="space-y-1.5">
+                        {getTraitChanges().map((change, index) => (
+                          <div key={index} className="text-xs flex items-center gap-2">
+                            <span className="text-yellow-400/70 font-medium">{change.slotName}:</span>
+                            <span className="text-gray-500 line-through">{change.oldTrait}</span>
+                            <span className="text-gray-600">→</span>
+                            <span className="text-green-400 font-medium">{change.newTrait.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Pricing */}
+                  {Object.keys(selectedTraits).length > 0 && (
+                    <div className="pt-2" style={{ borderTop: '1px solid rgba(201, 168, 76, 0.1)' }}>
+                      <div className="flex justify-between items-center mb-1.5">
+                        <span className="text-xs text-gray-400">
+                          Total ({Object.keys(selectedTraits).length} trait{Object.keys(selectedTraits).length > 1 ? 's' : ''})
+                        </span>
+                        <span className="text-base font-cinzel font-bold text-yellow-400">
+                          {getTotalPrice().displayText}
+                        </span>
+                      </div>
+                      <div className="space-y-0.5">
+                        {Object.values(selectedTraits).map(trait => (
+                          <div key={trait.id} className="flex justify-between text-[10px] text-gray-500">
+                            <span>{trait.name}</span>
+                            <span>{formatDecimalPrice(trait.priceAmount.toString())} {trait.priceToken.symbol}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Forge Button */}
+                  <div className="mt-auto pt-3">
+                    {Object.keys(selectedTraits).length > 0 ? (
+                      <button onClick={handlePurchaseStart} className="forge-button">
+                        ⚔️ Forge Upgrade — {getTotalPrice().displayText}
+                      </button>
+                    ) : (
+                      <div className="text-center text-gray-600 py-4 text-xs">
+                        Select traits to begin forging
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
           </div>
         </div>
       </div>

@@ -5,9 +5,7 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 
 export function WalletButton() {
-  return (
-    <WalletMultiButton className="!bg-blue-600 hover:!bg-blue-700 !rounded-lg !font-medium" />
-  );
+  return <WalletMultiButton />;
 }
 
 export function WalletConnectionStatus() {
@@ -15,14 +13,14 @@ export function WalletConnectionStatus() {
 
   if (!connected) {
     return (
-      <div className="text-gray-500">
+      <div className="text-gray-500 text-sm">
         Connect your wallet to view your NFTs
       </div>
     );
   }
 
   return (
-    <div className="text-green-600">
+    <div className="text-yellow-500 text-sm">
       Connected: {publicKey?.toBase58().slice(0, 8)}...{publicKey?.toBase58().slice(-8)}
     </div>
   );

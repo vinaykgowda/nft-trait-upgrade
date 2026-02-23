@@ -70,7 +70,7 @@ export function NFTGallery({ collectionIds, onNFTSelect, selectedNFT }: NFTGalle
           style={{ background: 'rgba(10,10,15,0.6)', border: '1px solid rgba(201,168,76,0.15)', color: '#e2d9c8' }}
         />
       </div>
-      <div className="overflow-y-auto pr-1" style={{ maxHeight: 'calc(100vh - 380px)' }}>
+      <div className="overflow-y-auto pr-1 max-h-[220px] sm:max-h-[calc(100vh-380px)]">
         <div className="grid grid-cols-4 gap-2.5">
           {filtered.map((nft) => (
             <NFTCard key={nft.address} nft={nft} selected={selectedNFT?.address === nft.address} onClick={() => onNFTSelect?.(nft)} />

@@ -313,19 +313,19 @@ export function TraitMarketplace() {
             </div>
 
             {/* BOTTOM: WITNESS THE TRANSFORMATION */}
-            <div className="forge-panel p-4 flex-1 flex flex-col min-h-0">
+            <div className="forge-panel p-4 flex flex-col">
               <h2 className="font-cinzel text-yellow-400 text-base sm:text-lg tracking-widest uppercase mb-3 text-center">
                 Witness the Transformation
               </h2>
 
               {!selectedNFT ? (
-                <div className="flex-1 flex items-center justify-center text-gray-500 text-sm">
+                <div className="flex items-center justify-center text-gray-500 text-sm py-4">
                   {collectionIds.length === 0
                     ? <div className="text-center"><p>No collections configured</p><p className="text-xs mt-1 text-gray-600">Admin needs to configure collection IDs</p></div>
                     : <p>Select a champion to see preview</p>}
                 </div>
               ) : (
-                <div className="flex-1 flex flex-col lg:flex-row gap-4 overflow-y-auto">
+                <div className="flex flex-col lg:flex-row gap-4">
                   {/* Original + Forged side by side */}
                   <div className="flex gap-3 flex-shrink-0">
                     <div className="w-40 lg:w-48">
@@ -347,9 +347,9 @@ export function TraitMarketplace() {
                   {/* Changes + Pricing + Button */}
                   <div className="flex-1 flex flex-col min-w-0">
                     {getTraitChanges().length > 0 && (
-                      <div className="mb-3">
-                        <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Changes</h4>
-                        <div className="space-y-1.5">
+                      <div className="mb-2">
+                        <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Changes</h4>
+                        <div className="space-y-1">
                           {getTraitChanges().map((change, i) => (
                             <div key={i} className="text-sm flex items-center gap-2">
                               <span className="text-yellow-400/80 font-medium">{change.slotName}:</span>
@@ -363,7 +363,7 @@ export function TraitMarketplace() {
                     )}
 
                     {Object.keys(selectedTraits).length > 0 && (
-                      <div className="pt-2 mb-3" style={{ borderTop: '1px solid rgba(201,168,76,0.1)' }}>
+                      <div className="pt-2 mb-2" style={{ borderTop: '1px solid rgba(201,168,76,0.1)' }}>
                         <div className="flex justify-between items-center">
                           <span className="text-sm text-gray-300 font-cinzel font-semibold uppercase tracking-wider">Forge Cost</span>
                           <span className="text-base font-cinzel font-bold text-yellow-400">
@@ -373,13 +373,13 @@ export function TraitMarketplace() {
                       </div>
                     )}
 
-                    <div className="mt-auto">
+                    <div className="mt-1">
                       {Object.keys(selectedTraits).length > 0 ? (
                         <button onClick={handlePurchaseStart} className="forge-button">
                           FORGE UPGRADE — {getTotalPrice().displayText}
                         </button>
                       ) : (
-                        <div className="text-center text-gray-600 py-3 text-sm">
+                        <div className="text-center text-gray-600 py-2 text-sm">
                           Select traits to begin forging
                         </div>
                       )}

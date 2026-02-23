@@ -184,6 +184,56 @@ export class TransactionBuilder {
     };
   }
 
+  /**
+   * Build a single transaction with multiple payment instructions (SOL + SPL tokens).
+   * User signs once and all payments are atomic.
+   */
+  async buildMixedPaymentTransaction(data: {
+    walletAddress: string;
+    assetId: string;
+    traitIds: string[];
+    payments: Array<{ amount: string; tokenMintAddress?: string }>;
+    treasuryWallet: string;
+  }): Promise<{ transaction: Transaction; requiredSignatures: string[]; delegateSignatures: string[] }> {
+    if (!this.initialized || !this.delegateKeypair) {
+      throw new Error('Delegate keypair not initialized');
+    }
+
+    const transaction = new Transaction();
+    const walletPubkey = new PublicKey(data.walletAddress);
+    const treasuryPubkey = new PublicKey(data.treasuryWallet);
+
+    console.log('💰 Building mixed payment transaction:', {
+      wallet: data.walletAddress,
+      treasury: data.treasuryWallet,
+      payments: data.payments,
+      traits: data.traitIds.length
+    });
+
+    for (const payment of data.payments) {
+      if (parseFloat(payment.amount) > 0) {
+        const instruction = await this.createPaymentInstruction(
+          walletPubkey,
+          treasuryPubkey,
+          payment.amount,
+          payment.tokenMintAddress
+        );
+        transaction.add(instruction);
+      }
+    }
+
+    const { blockhash } = await this.connection.getLatestBlockhash('confirmed');
+    transaction.recentBlockhash = blockhash;
+    transaction.feePayer = walletPubkey;
+
+    return {
+      transaction,
+      requiredSignatures: [data.walletAddress],
+      delegateSignatures: []
+    };
+  }
+
+
   async createPaymentInstruction(
     walletPubkey: PublicKey,
     treasuryPubkey: PublicKey,

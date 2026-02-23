@@ -68,54 +68,6 @@ export function EnhancedPurchaseFlow({ selectedNFT, selectedTraits, onSuccess, o
 
   const updateState = (updates: Partial<PurchaseState>) => setState(prev => ({ ...prev, ...updates }));
 
-  // Build, sign, and confirm a single payment transaction
-  const processPayment = async (reservationId: string, token: 'SOL' | 'LDZ', amount: number): Promise<string> => {
-    if (!publicKey || !signTransaction) throw new Error('Wallet not connected');
-
-    const buildResponse = await fetch('/api/tx/build', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        reservationId,
-        walletAddress: publicKey.toString(),
-        assetId: selectedNFT.address,
-        paymentToken: token,
-        totalAmount: amount,
-        transactionType: 'payment'
-      })
-    });
-
-    if (!buildResponse.ok) {
-      const error = await buildResponse.json();
-      throw new Error(error.message || `Failed to build ${token} transaction`);
-    }
-
-    const buildResult = await buildResponse.json();
-    const serializedTx = buildResult.data?.transaction || buildResult.transaction;
-    if (!serializedTx) throw new Error(`No transaction data received for ${token} payment`);
-
-    const { Transaction } = await import('@solana/web3.js');
-    const transaction = Transaction.from(Buffer.from(serializedTx, 'base64'));
-    const signedTx = await signTransaction(transaction);
-
-    const confirmResponse = await fetch('/api/tx/confirm', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        reservationId,
-        signedTransaction: Buffer.from(signedTx.serialize()).toString('base64')
-      })
-    });
-
-    if (!confirmResponse.ok) {
-      const error = await confirmResponse.json();
-      throw new Error(error.message || `${token} payment validation failed`);
-    }
-
-    const { txSignature } = await confirmResponse.json();
-    return txSignature;
-  };
-
   const handlePurchase = async () => {
     if (!publicKey || !signTransaction) {
       updateState({ step: 'error', error: 'Wallet not connected' });
@@ -152,21 +104,53 @@ export function EnhancedPurchaseFlow({ selectedNFT, selectedTraits, onSuccess, o
       if (!reservationId) throw new Error('No reservation ID returned from server');
       updateState({ reservationId });
 
-      // Process ALL payment groups sequentially
-      updateState({ step: 'payment_validating', progress: 20 });
-      let lastTxSignature = '';
+      // Build ONE transaction with ALL payments (SOL + SPL tokens combined)
+      updateState({ step: 'payment_validating', progress: 25 });
 
-      for (let i = 0; i < paymentGroups.length; i++) {
-        const group = paymentGroups[i];
-        console.log(`💰 Processing payment ${i + 1}/${paymentGroups.length}: ${group.amount} ${group.token}`);
-        const progressBase = 20 + (i * 30 / paymentGroups.length);
-        updateState({ progress: Math.round(progressBase) });
+      const buildResponse = await fetch('/api/tx/build', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reservationId,
+          walletAddress: publicKey.toString(),
+          assetId: selectedNFT.address,
+          payments: paymentGroups.map(g => ({ token: g.token, amount: g.amount })),
+          transactionType: 'payment'
+        })
+      });
 
-        lastTxSignature = await processPayment(reservationId, group.token, group.amount);
-        console.log(`✅ Payment ${i + 1} confirmed: ${lastTxSignature}`);
+      if (!buildResponse.ok) {
+        const error = await buildResponse.json();
+        throw new Error(error.message || 'Failed to build transaction');
       }
 
-      updateState({ txSignature: lastTxSignature, step: 'payment_validated', progress: 50 });
+      const buildResult = await buildResponse.json();
+      const serializedTx = buildResult.data?.transaction || buildResult.transaction;
+      if (!serializedTx) throw new Error('No transaction data received from server');
+
+      // User signs ONCE — the transaction contains all payment instructions
+      const { Transaction } = await import('@solana/web3.js');
+      const transaction = Transaction.from(Buffer.from(serializedTx, 'base64'));
+      const signedTx = await signTransaction(transaction);
+
+      const confirmResponse = await fetch('/api/tx/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reservationId,
+          signedTransaction: Buffer.from(signedTx.serialize()).toString('base64')
+        })
+      });
+
+      if (!confirmResponse.ok) {
+        const error = await confirmResponse.json();
+        throw new Error(error.message || 'Payment validation failed');
+      }
+
+      const { txSignature } = await confirmResponse.json();
+      console.log('✅ All payments confirmed in single transaction:', txSignature);
+
+      updateState({ txSignature, step: 'payment_validated', progress: 50 });
       await new Promise(r => setTimeout(r, 1500));
 
       // Metadata update
@@ -222,7 +206,7 @@ export function EnhancedPurchaseFlow({ selectedNFT, selectedTraits, onSuccess, o
             trait_type: slotMapping[trait.slotId] || trait.slotId,
             value: trait.name
           })),
-          txSignature: lastTxSignature
+          txSignature
         })
       });
 
@@ -235,7 +219,7 @@ export function EnhancedPurchaseFlow({ selectedNFT, selectedTraits, onSuccess, o
       console.log('✅ Metadata updated on-chain!', metadataResult.data?.signature || metadataResult.signature);
 
       updateState({ step: 'metadata_updated', progress: 90 });
-      if (onSuccess) onSuccess(lastTxSignature, newImageUrl);
+      if (onSuccess) onSuccess(txSignature, newImageUrl);
       await new Promise(r => setTimeout(r, 1500));
       updateState({ step: 'success', progress: 100 });
 
@@ -334,7 +318,7 @@ export function EnhancedPurchaseFlow({ selectedNFT, selectedTraits, onSuccess, o
                 </div>
                 {isMixed && (
                   <p className="text-sm text-amber-600">
-                    You will be asked to sign {paymentGroups.length} separate transactions (one per token type)
+                    All payments are bundled into a single transaction — one signature only.
                   </p>
                 )}
               </div>
@@ -350,7 +334,7 @@ export function EnhancedPurchaseFlow({ selectedNFT, selectedTraits, onSuccess, o
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" />
               <p className="text-lg font-medium text-gray-900 mb-2">{getStepMessage()}</p>
               <p className="text-sm text-gray-600">
-                {state.step === 'payment_validating' && isMixed && 'Processing multiple token payments sequentially...'}
+                {state.step === 'payment_validating' && isMixed && 'Processing bundled payment on blockchain...'}
                 {state.step === 'payment_validating' && !isMixed && `Confirming ${state.totalAmount} ${state.paymentToken} payment on blockchain...`}
                 {state.step === 'payment_validated' && 'Payment confirmed! Composing image and uploading to IPFS...'}
                 {state.step === 'metadata_updating' && 'Uploading composed image to IPFS and updating NFT metadata...'}

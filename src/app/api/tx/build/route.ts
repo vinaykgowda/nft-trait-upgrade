@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
       for (const p of payments) {
         let tokenMintAddress: string | undefined;
         if (p.token !== 'SOL') {
-          tokenMintAddress = await configService.getTokenMintAddress(p.token);
+          tokenMintAddress = await configService.getTokenMintAddress(p.token as 'SOL' | 'LDZ');
           if (!tokenMintAddress) {
             return apiResponse.error(`${p.token} token mint not configured`, 500);
           }

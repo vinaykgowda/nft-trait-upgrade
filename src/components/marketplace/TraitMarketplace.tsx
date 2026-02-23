@@ -156,8 +156,8 @@ export function TraitMarketplace() {
   }
 
   return (
-    <div className="h-screen overflow-hidden bg-cover bg-center bg-fixed" style={{ backgroundImage: "url('/bg.webp')", backgroundColor: '#0a0a0f' }}>
-      <div className="h-screen overflow-hidden" style={{ background: 'rgba(5, 5, 10, 0.75)' }}>
+    <div className="min-h-screen lg:h-screen lg:overflow-hidden bg-cover bg-center bg-fixed" style={{ backgroundImage: "url('/bg.webp')", backgroundColor: '#0a0a0f' }}>
+      <div className="min-h-screen lg:h-screen lg:overflow-hidden" style={{ background: 'rgba(5, 5, 10, 0.75)' }}>
 
         {/* SUCCESS MODAL */}
         {purchaseSuccess && (
@@ -184,7 +184,7 @@ export function TraitMarketplace() {
         </div>
 
         {/* MAIN 2-COLUMN LAYOUT */}
-        <div className="flex flex-col lg:flex-row p-2 sm:p-3 gap-3" style={{ height: 'calc(100vh - 140px)' }}>
+        <div className="flex flex-col lg:flex-row p-2 sm:p-3 gap-3 lg:h-[calc(100vh-140px)]">
 
           {/* LEFT COLUMN: NFTs */}
           <div className="lg:w-[42%] flex flex-col min-h-0">

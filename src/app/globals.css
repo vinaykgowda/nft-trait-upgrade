@@ -141,6 +141,16 @@ body {
   border: 1px solid rgba(201, 168, 76, 0.3) !important;
 }
 
+.wallet-adapter-modal-list {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0.5rem !important;
+}
+
+.wallet-adapter-modal-list li {
+  margin: 0 !important;
+}
+
 .wallet-adapter-modal-title {
   color: #c9a84c !important;
   font-family: 'Cinzel', serif !important;

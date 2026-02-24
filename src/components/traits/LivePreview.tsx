@@ -79,11 +79,8 @@ export function LivePreview({ baseNFT, selectedTraits, slots }: LivePreviewProps
     <div className="space-y-2">
       <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden relative">
         {loading && (
-          <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-10">
-            <div className="text-center text-white">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
-              <p className="text-sm">Composing NFT...</p>
-            </div>
+          <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center z-10">
+            <img src="/forging.webp" alt="Forging" className="w-24 h-24 object-contain" style={{ animation: 'breathing 2.5s ease-in-out infinite' }} />
           </div>
         )}
         

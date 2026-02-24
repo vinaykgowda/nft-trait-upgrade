@@ -177,14 +177,14 @@ export function TraitMarketplace() {
           </div>
         )}
 
-        {/* CENTERED LOGO + WALLET */}
-        <div className="flex flex-col items-center pt-2 pb-1">
-          <img src="/logo.webp" alt="Pepeverse Trait Forge" className="h-20 sm:h-24 object-contain drop-shadow-2xl" />
-          <div className="mt-1"><WalletMultiButton /></div>
+        {/* TOP BAR: Logo left, Wallet right */}
+        <div className="flex items-center justify-between px-3 sm:px-4 py-2">
+          <img src="/logo.webp" alt="Pepeverse Trait Forge" className="h-14 sm:h-16 object-contain drop-shadow-2xl" />
+          <WalletMultiButton />
         </div>
 
         {/* MAIN 2-COLUMN LAYOUT */}
-        <div className="flex flex-col lg:flex-row p-2 sm:p-3 gap-3 lg:h-[calc(100vh-140px)]">
+        <div className="flex flex-col lg:flex-row p-2 sm:p-3 gap-3 lg:h-[calc(100vh-80px)]">
 
           {/* LEFT COLUMN: NFTs */}
           <div className="lg:w-[42%] flex flex-col min-h-0">

@@ -145,10 +145,15 @@ body {
   display: flex !important;
   flex-direction: column !important;
   gap: 0.5rem !important;
+  padding: 0 1rem !important;
 }
 
 .wallet-adapter-modal-list li {
   margin: 0 !important;
+}
+
+.wallet-adapter-modal-list .wallet-adapter-button {
+  width: 100% !important;
 }
 
 .wallet-adapter-modal-title {

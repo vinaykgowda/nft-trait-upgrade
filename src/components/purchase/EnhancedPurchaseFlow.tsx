@@ -234,9 +234,9 @@ export function EnhancedPurchaseFlow({ selectedNFT, selectedTraits, onSuccess, o
       case 'confirm': return 'Review your purchase';
       case 'payment_approved': return 'Payment approved.. validating..';
       case 'payment_validating': return isMixed ? 'Processing payments (multiple tokens)...' : 'Payment approved.. validating..';
-      case 'payment_validated': return 'Payment validated.. composing and uploading image..';
-      case 'metadata_updating': return 'Image uploaded.. updating metadata..';
-      case 'metadata_updated': return 'Metadata updated..';
+      case 'payment_validated': return 'Payment validated.. forging your champion..';
+      case 'metadata_updating': return 'Applying traits to your champion..';
+      case 'metadata_updated': return 'Almost done..';
       case 'success': return 'Congrats, your NFT Upgrade completed.';
       case 'error': return 'Purchase failed';
       default: return '';
@@ -331,13 +331,13 @@ export function EnhancedPurchaseFlow({ selectedNFT, selectedTraits, onSuccess, o
 
           {isProcessing && (
             <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" />
+              <img src="/forging.webp" alt="Forging" className="w-32 h-32 object-contain mx-auto mb-4" style={{ animation: 'breathing 2.5s ease-in-out infinite' }} />
               <p className="text-lg font-medium text-gray-900 mb-2">{getStepMessage()}</p>
               <p className="text-sm text-gray-600">
                 {state.step === 'payment_validating' && isMixed && 'Processing bundled payment on blockchain...'}
                 {state.step === 'payment_validating' && !isMixed && `Confirming ${state.totalAmount} ${state.paymentToken} payment on blockchain...`}
-                {state.step === 'payment_validated' && 'Payment confirmed! Composing image and uploading to IPFS...'}
-                {state.step === 'metadata_updating' && 'Uploading composed image to IPFS and updating NFT metadata...'}
+                {state.step === 'payment_validated' && 'Payment confirmed! Forging your champion...'}
+                {state.step === 'metadata_updating' && 'Applying traits and updating your champion...'}
                 {state.step === 'metadata_updated' && 'Finalizing your NFT upgrade...'}
               </p>
             </div>

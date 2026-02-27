@@ -70,7 +70,7 @@ CREATE TABLE traits (
     rarity_tier_id UUID REFERENCES rarity_tiers(id),
     total_supply INTEGER, -- NULL = unlimited
     remaining_supply INTEGER,
-    price_amount BIGINT NOT NULL,
+    price_amount NUMERIC(20,9) NOT NULL,
     price_token_id UUID REFERENCES tokens(id),
     active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT NOW(),
@@ -110,7 +110,7 @@ CREATE TABLE purchases (
     wallet_address VARCHAR(44) NOT NULL,
     asset_id VARCHAR(44) NOT NULL,
     trait_id UUID REFERENCES traits(id),
-    price_amount BIGINT NOT NULL,
+    price_amount NUMERIC(20,9) NOT NULL,
     token_id UUID REFERENCES tokens(id),
     treasury_wallet VARCHAR(44) NOT NULL,
     status VARCHAR(20) DEFAULT 'created',

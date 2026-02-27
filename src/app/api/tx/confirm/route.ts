@@ -6,10 +6,11 @@ import { PurchaseRepository } from '@/lib/repositories/purchases';
 import { TransactionMonitor } from '@/lib/services/transaction-monitor';
 import { configService } from '@/lib/services/config';
 import { Transaction } from '@solana/web3.js';
+import { query } from '@/lib/database';
 
 const confirmTransactionSchema = z.object({
   reservationId: z.string().uuid(),
-  signedTransaction: z.string(), // Base64 encoded signed transaction
+  signedTransaction: z.string(),
 });
 
 export async function POST(request: NextRequest) {
@@ -61,11 +62,11 @@ export async function POST(request: NextRequest) {
       hasUpdate: validation.hasUpdateInstruction
     });
 
-    // Get trait data to determine actual price and token
+    // Get trait data for price and token info
     const traitRepo = new (await import('@/lib/repositories/traits')).TraitRepository();
     const traitsWithRelations = await traitRepo.findWithRelations({});
     const trait = traitsWithRelations.find(t => t.id === reservation.traitId);
-    
+
     if (!trait) {
       return NextResponse.json(
         { success: false, error: 'Trait not found' },
@@ -73,21 +74,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get dynamic treasury wallet from config
     const treasuryWallet = await configService.getTreasuryWallet();
 
-    // Create purchase record with actual trait data
+    // Consume reservation and create purchase record
+    // This decrements supply inside a transaction
     const purchaseData = {
       walletAddress: reservation.walletAddress,
       assetId: reservation.assetId,
       traitId: reservation.traitId,
-      priceAmount: trait.price_amount, // Use actual trait price (already in base units)
-      tokenId: trait.price_token_id, // Use actual token ID
-      treasuryWallet: treasuryWallet, // Use dynamic treasury wallet
+      priceAmount: trait.price_amount,
+      tokenId: trait.price_token_id,
+      treasuryWallet: treasuryWallet,
       status: 'tx_built' as const,
     };
 
-    // Consume the reservation and create purchase records
     const consumeResult = await inventoryManager.consumeReservation(reservationId, purchaseData);
     if (!consumeResult.success) {
       return NextResponse.json(
@@ -101,20 +101,16 @@ export async function POST(request: NextRequest) {
     try {
       console.log('📡 Sending atomic transaction to Solana...');
 
-      // Send the transaction to the network
       const result = await transactionBuilder.sendAndConfirmTransaction({
         transaction,
         requiredSignatures: [reservation.walletAddress],
-        delegateSignatures: [], // Would be populated from build step
+        delegateSignatures: [],
       });
 
       if (result.success) {
         console.log('✅ Atomic transaction confirmed:', result.signature);
 
-        // Update purchase record with transaction signature
         await purchaseRepo.updateStatus(purchase.id, 'confirmed', result.signature);
-
-        // Start monitoring the transaction for finalization
         await transactionMonitor.startMonitoring(result.signature!, purchase.id);
 
         return NextResponse.json({
@@ -122,15 +118,16 @@ export async function POST(request: NextRequest) {
           signature: result.signature,
           purchaseId: purchase.id,
           status: 'confirmed',
-          message: 'Atomic transaction completed successfully - payment processed and metadata updated',
+          message: 'Transaction completed successfully',
           paymentExecuted: result.paymentExecuted,
           updateExecuted: result.updateExecuted,
         });
       } else {
         console.error('❌ Transaction failed:', result.error);
 
-        // Update purchase record with failure
+        // Transaction failed — restore supply and mark purchase as failed
         await purchaseRepo.updateStatus(purchase.id, 'failed');
+        await restoreSupply(reservation.traitId);
 
         return NextResponse.json(
           { success: false, error: result.error || 'Transaction failed' },
@@ -140,8 +137,9 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       console.error('❌ Transaction confirmation error:', error);
 
-      // Update purchase record with failure
+      // Exception during send — restore supply and mark purchase as failed
       await purchaseRepo.updateStatus(purchase.id, 'failed');
+      await restoreSupply(reservation.traitId);
 
       return NextResponse.json(
         { success: false, error: 'Transaction confirmation failed' },
@@ -150,7 +148,7 @@ export async function POST(request: NextRequest) {
     }
   } catch (error) {
     console.error('❌ Transaction confirm error:', error);
-    
+
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { success: false, error: 'Invalid request data', details: error.errors },
@@ -163,5 +161,23 @@ export async function POST(request: NextRequest) {
       { success: false, error: message },
       { status: 500 }
     );
+  }
+}
+
+/**
+ * Restore supply for a trait when a transaction fails after reservation was consumed.
+ * This prevents supply from being permanently lost on failed transactions.
+ */
+async function restoreSupply(traitId: string): Promise<void> {
+  try {
+    await query(
+      `UPDATE traits SET remaining_supply = remaining_supply + 1
+       WHERE id = $1 AND remaining_supply IS NOT NULL AND total_supply IS NOT NULL
+       AND remaining_supply < total_supply`,
+      [traitId]
+    );
+    console.log('🔄 Supply restored for trait:', traitId);
+  } catch (err) {
+    console.error('❌ Failed to restore supply for trait:', traitId, err);
   }
 }

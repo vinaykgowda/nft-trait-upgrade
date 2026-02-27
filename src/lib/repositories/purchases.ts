@@ -8,7 +8,7 @@ export interface PurchaseRow {
   wallet_address: string;
   asset_id: string;
   trait_id: string;
-  price_amount: string; // bigint stored as string
+  price_amount: string; // numeric stored as string
   token_id: string;
   treasury_wallet: string;
   status: PurchaseStatus;
@@ -178,7 +178,7 @@ export class PurchaseRepository extends BaseRepository<PurchaseRow> {
       wallet_address: purchase.walletAddress,
       asset_id: purchase.assetId,
       trait_id: purchase.traitId,
-      price_amount: purchase.priceAmount ? Math.floor(Number(purchase.priceAmount)).toString() : undefined,
+      price_amount: purchase.priceAmount !== undefined ? purchase.priceAmount.toString() : undefined,
       token_id: purchase.tokenId,
       treasury_wallet: purchase.treasuryWallet,
       status: purchase.status,

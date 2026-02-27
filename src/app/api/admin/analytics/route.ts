@@ -22,10 +22,10 @@ export async function GET(request: NextRequest) {
     const auditRepo = getAuditLogRepository();
 
     // Parse dates
-    const start = startDate ? new Date(startDate) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // 30 days ago
+    const start = startDate ? new Date(startDate) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const end = endDate ? new Date(endDate) : new Date();
 
-    // Get revenue statistics
+    // Get revenue statistics (includes confirmed + fulfilled purchases)
     const revenueStats = await purchaseRepo.getRevenueStats(start, end);
 
     // Get trait statistics
@@ -37,8 +37,9 @@ export async function GET(request: NextRequest) {
       traitsOutOfStock: allTraits.filter((t: any) => t.remaining_supply === 0).length,
     };
 
-    // Get recent purchases
-    const recentPurchases = await purchaseRepo.findByStatus('fulfilled');
+    // Get recent purchases (confirmed + fulfilled within date range)
+    const completedStatuses: ('confirmed' | 'fulfilled')[] = ['confirmed', 'fulfilled'];
+    const recentPurchases = await purchaseRepo.findByStatuses(completedStatuses, start, end);
     const purchasesByDay = recentPurchases.reduce((acc: Record<string, number>, purchase: any) => {
       const day = purchase.created_at.toISOString().split('T')[0];
       acc[day] = (acc[day] || 0) + 1;
@@ -68,7 +69,7 @@ export async function GET(request: NextRequest) {
       traits: traitStats,
       purchases: {
         byDay: purchasesByDay,
-        recent: recentPurchases.slice(0, 20), // Last 20 purchases
+        recent: recentPurchases.slice(0, 20),
       },
       topTraits,
       auditActivity: auditStats,

@@ -29,7 +29,6 @@ export class PurchaseRepository extends BaseRepository<PurchaseRow> {
       ORDER BY created_at DESC
     `;
     const queryFn = client ? client.query.bind(client) : query;
-    
     const result = await queryFn(queryText, [walletAddress]);
     return result.rows;
   }
@@ -41,8 +40,34 @@ export class PurchaseRepository extends BaseRepository<PurchaseRow> {
       ORDER BY created_at ASC
     `;
     const queryFn = client ? client.query.bind(client) : query;
-    
     const result = await queryFn(queryText, [status]);
+    return result.rows;
+  }
+
+  async findByStatuses(statuses: PurchaseStatus[], startDate?: Date, endDate?: Date, client?: PoolClient): Promise<PurchaseRow[]> {
+    const params: any[] = [statuses];
+    let paramIndex = 2;
+    let dateFilter = '';
+
+    if (startDate) {
+      dateFilter += ' AND created_at >= $' + paramIndex;
+      params.push(startDate);
+      paramIndex++;
+    }
+
+    if (endDate) {
+      dateFilter += ' AND created_at <= $' + paramIndex;
+      params.push(endDate);
+      paramIndex++;
+    }
+
+    const queryText = `
+      SELECT * FROM ${this.tableName}
+      WHERE status = ANY($1)${dateFilter}
+      ORDER BY created_at DESC
+    `;
+    const queryFn = client ? client.query.bind(client) : query;
+    const result = await queryFn(queryText, params);
     return result.rows;
   }
 
@@ -53,7 +78,6 @@ export class PurchaseRepository extends BaseRepository<PurchaseRow> {
       LIMIT 1
     `;
     const queryFn = client ? client.query.bind(client) : query;
-    
     const result = await queryFn(queryText, [txSignature]);
     return result.rows[0] || null;
   }
@@ -66,7 +90,6 @@ export class PurchaseRepository extends BaseRepository<PurchaseRow> {
       RETURNING *
     `;
     const queryFn = client ? client.query.bind(client) : query;
-    
     const result = await queryFn(queryText, [id, status, txSignature]);
     return result.rows[0] || null;
   }
@@ -79,7 +102,6 @@ export class PurchaseRepository extends BaseRepository<PurchaseRow> {
       ORDER BY created_at ASC
     `;
     const queryFn = client ? client.query.bind(client) : query;
-    
     const result = await queryFn(queryText);
     return result.rows;
   }
@@ -89,18 +111,18 @@ export class PurchaseRepository extends BaseRepository<PurchaseRow> {
     totalPurchases: number;
     revenueByToken: { tokenId: string; revenue: string; count: number }[];
   }> {
-    let whereClause = "WHERE status = 'fulfilled'";
+    let whereClause = "WHERE status IN ('confirmed', 'fulfilled')";
     const params: any[] = [];
     let paramIndex = 1;
 
     if (startDate) {
-      whereClause += ` AND created_at >= $${paramIndex}`;
+      whereClause += ' AND created_at >= $' + paramIndex;
       params.push(startDate);
       paramIndex++;
     }
 
     if (endDate) {
-      whereClause += ` AND created_at <= $${paramIndex}`;
+      whereClause += ' AND created_at <= $' + paramIndex;
       params.push(endDate);
       paramIndex++;
     }
@@ -142,7 +164,7 @@ export class PurchaseRepository extends BaseRepository<PurchaseRow> {
       walletAddress: row.wallet_address,
       assetId: row.asset_id,
       traitId: row.trait_id,
-      priceAmount: row.price_amount, // Keep as string
+      priceAmount: row.price_amount,
       tokenId: row.token_id,
       treasuryWallet: row.treasury_wallet,
       status: row.status,
@@ -163,7 +185,6 @@ export class PurchaseRepository extends BaseRepository<PurchaseRow> {
       tx_signature: purchase.txSignature,
     };
 
-    // Only include id if it's defined (for create operations)
     if (purchase.id !== undefined) {
       result.id = purchase.id;
     }

@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (!await authService.hasPermission(sessionData, 'analyst')) {
+    if (!await authService.hasPermission(sessionData, 'analyst') && !await authService.hasPermission(sessionData, 'admin')) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
     }
 

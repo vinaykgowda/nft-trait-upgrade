@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import AdminNavigation from '@/components/admin/AdminNavigation';
 
 interface Project {
   id: string;
@@ -39,26 +38,17 @@ export default function TokenManagerPage() {
     loading: false
   });
 
-  useEffect(() => {
-    fetchProjects();
-  }, []);
+  useEffect(() => { fetchProjects(); }, []);
 
   const fetchProjects = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/admin/projects', {
-        credentials: 'include'
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
+      const response = await fetch('/api/admin/projects', { credentials: 'include' });
+      if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       const data = await response.json();
       setProjects(data.projects || []);
       setError(null);
     } catch (err) {
-      console.error('Failed to fetch projects:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch projects');
     } finally {
       setLoading(false);
@@ -70,67 +60,35 @@ export default function TokenManagerPage() {
       setTokenForm(prev => ({ ...prev, tokenInfo: null }));
       return;
     }
-
     setTokenForm(prev => ({ ...prev, loading: true }));
-    
     try {
       const response = await fetch('/api/admin/tokens/info', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ tokenAddress: tokenAddress.trim() })
       });
-
       if (response.ok) {
         const data = await response.json();
-        setTokenForm(prev => ({ 
-          ...prev, 
-          tokenInfo: data.tokenInfo,
-          loading: false 
-        }));
+        setTokenForm(prev => ({ ...prev, tokenInfo: data.tokenInfo, loading: false }));
       } else {
-        setTokenForm(prev => ({ 
-          ...prev, 
-          tokenInfo: null,
-          loading: false 
-        }));
+        setTokenForm(prev => ({ ...prev, tokenInfo: null, loading: false }));
       }
-    } catch (err) {
-      console.error('Failed to fetch token info:', err);
-      setTokenForm(prev => ({ 
-        ...prev, 
-        tokenInfo: null,
-        loading: false 
-      }));
+    } catch {
+      setTokenForm(prev => ({ ...prev, tokenInfo: null, loading: false }));
     }
   };
 
   const addToken = async () => {
-    if (!selectedProject) {
-      alert('Please select a project first');
-      return;
-    }
-
-    if (!tokenForm.tokenInfo) {
-      alert('Please enter a valid token address first');
-      return;
-    }
-
+    if (!selectedProject) { alert('Please select a project first'); return; }
+    if (!tokenForm.tokenInfo) { alert('Please enter a valid token address first'); return; }
     try {
       const response = await fetch(`/api/admin/projects/${selectedProject}/tokens`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ 
-          tokenAddress: tokenForm.tokenInfo.address,
-          enabled: true 
-        })
+        body: JSON.stringify({ tokenAddress: tokenForm.tokenInfo.address, enabled: true })
       });
-
       if (response.ok) {
         await fetchProjects();
         setTokenForm({ tokenAddress: '', tokenInfo: null, loading: false });
@@ -139,231 +97,158 @@ export default function TokenManagerPage() {
         const errorData = await response.json();
         alert(`Failed to add token: ${errorData.error}`);
       }
-    } catch (err) {
-      console.error('Failed to add token:', err);
-      alert('Failed to add token');
-    }
+    } catch { alert('Failed to add token'); }
   };
 
   const removeToken = async (projectId: string, tokenId: string, tokenSymbol: string) => {
-    if (tokenSymbol === 'SOL') {
-      alert('Cannot remove SOL - it is the default payment token');
-      return;
-    }
-
-    if (!confirm(`Are you sure you want to remove ${tokenSymbol} token?`)) {
-      return;
-    }
-
+    if (tokenSymbol === 'SOL') { alert('Cannot remove SOL — it is the default payment token'); return; }
+    if (!confirm(`Remove ${tokenSymbol} token?`)) return;
     try {
       const response = await fetch(`/api/admin/projects/${projectId}/tokens?tokenId=${tokenId}`, {
-        method: 'DELETE',
-        credentials: 'include'
+        method: 'DELETE', credentials: 'include'
       });
-
-      if (response.ok) {
-        await fetchProjects();
-        alert('Token removed successfully');
-      } else {
-        const errorData = await response.json();
-        alert(`Failed to remove token: ${errorData.error}`);
-      }
-    } catch (err) {
-      console.error('Failed to remove token:', err);
-      alert('Failed to remove token');
-    }
+      if (response.ok) { await fetchProjects(); alert('Token removed'); }
+      else { const d = await response.json(); alert(`Failed: ${d.error}`); }
+    } catch { alert('Failed to remove token'); }
   };
 
   const selectedProjectData = projects.find(p => p.id === selectedProject);
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black text-green-400">
-        <AdminNavigation />
-        <div className="p-6">
-          <div className="flex items-center justify-center h-64">
-            <div className="text-xl">Loading projects...</div>
-          </div>
-        </div>
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-violet-500 border-t-transparent" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-black text-green-400">
-      <AdminNavigation />
-      <div className="p-6">
-        <div className="max-w-6xl mx-auto">
-          <div className="mb-8">
-            <h1 className="text-4xl font-bold text-green-400 mb-2">🪙 Token Manager</h1>
-            <p className="text-gray-300">Manage payment tokens for your projects. SOL is included by default.</p>
-          </div>
+    <>
+      <div className="mb-8">
+        <h1 className="text-2xl font-semibold text-white tracking-tight">Token Manager</h1>
+        <p className="mt-1 text-sm text-white/40">Manage payment tokens for your projects. SOL is included by default.</p>
+      </div>
 
-          {error && (
-            <div className="bg-red-900 border border-red-600 text-red-200 px-4 py-3 rounded mb-6">
-              Error: {error}
-            </div>
-          )}
+      {error && (
+        <div className="mb-6 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">{error}</div>
+      )}
 
-          {/* Project Selection */}
-          <div className="bg-gray-900 border border-green-600 rounded-lg p-6 mb-8">
-            <h2 className="text-2xl font-bold text-green-400 mb-4">📋 Select Project</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">Choose Project:</label>
-                <select
-                  value={selectedProject}
-                  onChange={(e) => setSelectedProject(e.target.value)}
-                  className="w-full bg-black border border-green-600 rounded px-3 py-2 text-green-400 focus:outline-none focus:border-green-400"
-                >
-                  <option value="">-- Select a Project --</option>
-                  {projects.map((project) => (
-                    <option key={project.id} value={project.id}>
-                      {project.name} ({project.tokens?.length || 0} tokens)
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex items-end">
-                <div className="text-sm text-gray-400">
-                  {projects.length} project{projects.length !== 1 ? 's' : ''} available
-                </div>
-              </div>
-            </div>
-          </div>
+      {/* Project Selection */}
+      <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5 mb-6">
+        <label className="block text-xs font-medium text-white/50 mb-1.5">Select Project</label>
+        <select
+          value={selectedProject}
+          onChange={(e) => setSelectedProject(e.target.value)}
+          className="w-full max-w-md px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm focus:outline-none focus:border-violet-500/50 transition-colors"
+        >
+          <option value="">-- Select a Project --</option>
+          {projects.map((project) => (
+            <option key={project.id} value={project.id}>
+              {project.name} ({project.tokens?.length || 0} tokens)
+            </option>
+          ))}
+        </select>
+        <p className="text-xs text-white/20 mt-2">{projects.length} project{projects.length !== 1 ? 's' : ''} available</p>
+      </div>
 
-          {/* Current Tokens Display */}
-          {selectedProjectData && (
-            <div className="bg-gray-900 border border-green-600 rounded-lg p-6 mb-8">
-              <h2 className="text-2xl font-bold text-green-400 mb-4">
-                💰 Current Tokens for "{selectedProjectData.name}"
-              </h2>
-              
-              {selectedProjectData.tokens && selectedProjectData.tokens.length > 0 ? (
-                <div className="space-y-3">
-                  {selectedProjectData.tokens.map((token) => (
-                    <div key={token.id} className="bg-green-900 border border-green-500 rounded-lg p-4">
-                      <div className="flex justify-between items-center">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3">
-                            <span className="text-2xl font-bold text-green-200">
-                              {token.tokenSymbol || 'UNKNOWN'}
-                            </span>
-                            <span className="text-green-100 text-lg">
-                              {token.tokenName || 'Unknown Token'}
-                            </span>
-                            {token.tokenSymbol === 'SOL' && (
-                              <span className="bg-yellow-600 text-black px-2 py-1 rounded text-xs font-bold">
-                                DEFAULT
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-sm text-green-300 mt-1">
-                            <span className="font-mono">{token.tokenAddress}</span>
-                            <span className="ml-4">Decimals: {token.decimals}</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {token.tokenSymbol !== 'SOL' && (
-                            <button
-                              onClick={() => removeToken(selectedProjectData.id, token.id, token.tokenSymbol || 'TOKEN')}
-                              className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded transition-colors font-semibold"
-                            >
-                              Remove
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <div className="text-gray-400 text-lg">No tokens configured</div>
-                  <div className="text-gray-500 text-sm mt-2">SOL should be added automatically</div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Add New Token */}
-          {selectedProject && (
-            <div className="bg-blue-900 border border-blue-500 rounded-lg p-6">
-              <h2 className="text-2xl font-bold text-blue-200 mb-4">➕ Add New Payment Token</h2>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-blue-300">
-                    SPL Token Mint Address:
-                  </label>
-                  <input
-                    type="text"
-                    value={tokenForm.tokenAddress}
-                    onChange={(e) => {
-                      setTokenForm(prev => ({ ...prev, tokenAddress: e.target.value }));
-                      fetchTokenInfo(e.target.value);
-                    }}
-                    className="w-full bg-black border border-blue-500 rounded px-3 py-2 text-blue-200 focus:outline-none focus:border-blue-400"
-                    placeholder="Enter SPL token mint address (e.g., EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v for USDC)"
-                  />
-                </div>
-                
-                {tokenForm.loading && (
-                  <div className="text-yellow-300 text-sm flex items-center gap-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-300"></div>
-                    Fetching token information from Helius API...
+      {/* Current Tokens */}
+      {selectedProjectData && (
+        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5 mb-6">
+          <h2 className="text-sm font-semibold text-white mb-4">
+            Tokens for &ldquo;{selectedProjectData.name}&rdquo;
+          </h2>
+          {selectedProjectData.tokens && selectedProjectData.tokens.length > 0 ? (
+            <div className="space-y-2">
+              {selectedProjectData.tokens.map((token) => (
+                <div key={token.id} className="flex items-center justify-between p-3 rounded-lg bg-white/[0.03] border border-white/[0.06]">
+                  <div className="flex items-center gap-3">
+                    <span className="text-base font-semibold text-white">{token.tokenSymbol || 'UNKNOWN'}</span>
+                    <span className="text-sm text-white/40">{token.tokenName || 'Unknown Token'}</span>
+                    {token.tokenSymbol === 'SOL' && (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/30">DEFAULT</span>
+                    )}
                   </div>
-                )}
-                
-                {tokenForm.tokenInfo && (
-                  <div className="bg-green-900 border border-green-500 p-4 rounded">
-                    <div className="text-green-300 font-bold text-lg">✅ {tokenForm.tokenInfo.symbol}</div>
-                    <div className="text-green-200">{tokenForm.tokenInfo.name}</div>
-                    <div className="text-green-200 text-sm">Decimals: {tokenForm.tokenInfo.decimals}</div>
-                    <div className="text-green-300 text-xs mt-2 font-mono">{tokenForm.tokenInfo.address}</div>
-                  </div>
-                )}
-                
-                <button
-                  onClick={addToken}
-                  disabled={!tokenForm.tokenInfo || tokenForm.loading}
-                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg transition-colors font-bold text-lg"
-                >
-                  {tokenForm.loading ? 'Loading...' : 'Add Payment Token'}
-                </button>
-              </div>
-
-              <div className="mt-6 p-4 bg-gray-800 rounded border border-gray-600">
-                <h3 className="text-lg font-semibold text-gray-300 mb-2">💡 Popular Token Addresses:</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                  <div className="text-gray-400">
-                    <strong>USDC:</strong> EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
-                  </div>
-                  <div className="text-gray-400">
-                    <strong>USDT:</strong> Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB
-                  </div>
-                  <div className="text-gray-400">
-                    <strong>BONK:</strong> DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263
-                  </div>
-                  <div className="text-gray-400">
-                    <strong>WIF:</strong> EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm
-                  </div>
-                  <div className="text-gray-400">
-                    <strong>LDZ (Voodoo):</strong> E5ZVeBMazQAYq4UEiSNRLxfMeRds9SKL31yPan7j5GJK
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-white/20 font-mono hidden md:inline">{token.tokenAddress}</span>
+                    {token.tokenSymbol !== 'SOL' && (
+                      <button
+                        onClick={() => removeToken(selectedProjectData.id, token.id, token.tokenSymbol || 'TOKEN')}
+                        className="px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs hover:bg-red-500/20 transition-colors"
+                      >
+                        Remove
+                      </button>
+                    )}
                   </div>
                 </div>
-              </div>
+              ))}
             </div>
-          )}
-
-          {!selectedProject && (
-            <div className="text-center py-12">
-              <div className="text-2xl text-gray-400 mb-4">👆 Select a project above to manage its tokens</div>
-              <div className="text-gray-500">You can add multiple SPL tokens for trait purchases</div>
-            </div>
+          ) : (
+            <p className="text-sm text-white/20 text-center py-6">No tokens configured</p>
           )}
         </div>
-      </div>
-    </div>
+      )}
+
+      {/* Add New Token */}
+      {selectedProject && (
+        <div className="rounded-xl border border-violet-500/20 bg-violet-500/[0.04] p-5">
+          <h2 className="text-sm font-semibold text-white mb-4">Add Payment Token</h2>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-white/50 mb-1.5">SPL Token Mint Address</label>
+              <input
+                type="text"
+                value={tokenForm.tokenAddress}
+                onChange={(e) => {
+                  setTokenForm(prev => ({ ...prev, tokenAddress: e.target.value }));
+                  fetchTokenInfo(e.target.value);
+                }}
+                className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder-white/20 focus:outline-none focus:border-violet-500/50 transition-colors"
+                placeholder="Enter SPL token mint address"
+              />
+            </div>
+
+            {tokenForm.loading && (
+              <div className="flex items-center gap-2 text-sm text-white/40">
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-violet-500 border-t-transparent" />
+                Fetching token info...
+              </div>
+            )}
+
+            {tokenForm.tokenInfo && (
+              <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                <div className="text-sm font-semibold text-emerald-400">{tokenForm.tokenInfo.symbol}</div>
+                <div className="text-xs text-white/40">{tokenForm.tokenInfo.name} · Decimals: {tokenForm.tokenInfo.decimals}</div>
+                <div className="text-xs text-white/20 font-mono mt-1">{tokenForm.tokenInfo.address}</div>
+              </div>
+            )}
+
+            <button
+              onClick={addToken}
+              disabled={!tokenForm.tokenInfo || tokenForm.loading}
+              className="px-5 py-2 rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-sm font-medium hover:from-violet-500 hover:to-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+            >
+              Add Token
+            </button>
+          </div>
+
+          <div className="mt-5 p-4 rounded-lg bg-white/[0.02] border border-white/[0.06]">
+            <p className="text-xs font-medium text-white/30 mb-2">Popular Token Addresses</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5 text-xs text-white/20 font-mono">
+              <div>USDC: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v</div>
+              <div>USDT: Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB</div>
+              <div>BONK: DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263</div>
+              <div>WIF: EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm</div>
+              <div>LDZ: E5ZVeBMazQAYq4UEiSNRLxfMeRds9SKL31yPan7j5GJK</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!selectedProject && (
+        <div className="text-center py-12">
+          <p className="text-white/30">Select a project above to manage its tokens</p>
+        </div>
+      )}
+    </>
   );
 }

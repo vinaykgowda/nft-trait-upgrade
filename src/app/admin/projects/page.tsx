@@ -205,313 +205,266 @@ export default function ProjectsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black text-green-400 p-6">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-xl">Loading projects...</div>
-        </div>
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-violet-500 border-t-transparent" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-black text-green-400 p-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-green-400">Projects Management</h1>
-          <button
-            onClick={() => setShowCreateForm(true)}
-            className="bg-green-600 hover:bg-green-700 text-black px-6 py-2 rounded-lg font-semibold transition-colors"
-          >
-            Create New Project
-          </button>
+    <>
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <h1 className="text-2xl font-semibold text-white tracking-tight">Projects</h1>
+          <p className="mt-1 text-sm text-white/40">Manage project settings and collections</p>
         </div>
+        <button
+          onClick={() => setShowCreateForm(true)}
+          className="px-4 py-2 rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-sm font-medium hover:from-violet-500 hover:to-indigo-500 transition-all shadow-lg shadow-violet-500/20"
+        >
+          + New Project
+        </button>
+      </div>
 
-        {error && (
-          <div className="bg-red-900 border border-red-600 text-red-200 px-4 py-3 rounded mb-6">
-            Error: {error}
-          </div>
-        )}
+      {error && (
+        <div className="mb-6 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+          {error}
+        </div>
+      )}
 
-        {/* Create/Edit Form */}
-        {showCreateForm && (
-          <div className="bg-gray-900 border border-green-600 rounded-lg p-6 mb-8">
-            <h2 className="text-xl font-bold mb-4">
-              {editingProject ? 'Edit Project' : 'Create New Project'}
-            </h2>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">Name *</label>
-                  <input
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => setFormData({...formData, name: e.target.value})}
-                    className="w-full bg-black border border-green-600 rounded px-3 py-2 text-green-400 focus:outline-none focus:border-green-400"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Treasury Wallet *</label>
-                  <input
-                    type="text"
-                    value={formData.treasuryWallet}
-                    onChange={(e) => setFormData({...formData, treasuryWallet: e.target.value})}
-                    className="w-full bg-black border border-green-600 rounded px-3 py-2 text-green-400 focus:outline-none focus:border-green-400"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">Seller Fee Basis Points *</label>
-                  <input
-                    type="number"
-                    value={formData.sellerFeeBasisPoints}
-                    onChange={(e) => setFormData({...formData, sellerFeeBasisPoints: parseInt(e.target.value) || 0})}
-                    className="w-full bg-black border border-green-600 rounded px-3 py-2 text-green-400 focus:outline-none focus:border-green-400"
-                    min={0}
-                    max={10000}
-                    required
-                  />
-                  <p className="text-gray-500 text-xs mt-1">{(formData.sellerFeeBasisPoints / 100).toFixed(2)}% royalty (690 = 6.9%)</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Collection Symbol *</label>
-                  <input
-                    type="text"
-                    value={formData.collectionSymbol}
-                    onChange={(e) => setFormData({...formData, collectionSymbol: e.target.value})}
-                    className="w-full bg-black border border-green-600 rounded px-3 py-2 text-green-400 focus:outline-none focus:border-green-400"
-                    maxLength={20}
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Creator Address</label>
-                  <input
-                    type="text"
-                    value={formData.creatorAddress}
-                    onChange={(e) => setFormData({...formData, creatorAddress: e.target.value})}
-                    className="w-full bg-black border border-green-600 rounded px-3 py-2 text-green-400 focus:outline-none focus:border-green-400"
-                    placeholder="Falls back to update authority if empty"
-                  />
-                </div>
-              </div>
-
+      {/* Create/Edit Form */}
+      {showCreateForm && (
+        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-6 mb-8">
+          <h2 className="text-lg font-semibold text-white mb-4">
+            {editingProject ? 'Edit Project' : 'New Project'}
+          </h2>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-2">Description</label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({...formData, description: e.target.value})}
-                  className="w-full bg-black border border-green-600 rounded px-3 py-2 text-green-400 focus:outline-none focus:border-green-400"
-                  rows={3}
+                <label className="block text-xs font-medium text-white/50 mb-1.5">Name *</label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm focus:outline-none focus:border-violet-500/50 transition-colors"
+                  required
                 />
               </div>
-
               <div>
-                <label className="block text-sm font-medium mb-2">Collection IDs *</label>
-                {formData.collectionIds.map((id, index) => (
-                  <div key={index} className="flex gap-2 mb-2">
-                    <input
-                      type="text"
-                      value={id}
-                      onChange={(e) => updateCollectionId(index, e.target.value)}
-                      className="flex-1 bg-black border border-green-600 rounded px-3 py-2 text-green-400 focus:outline-none focus:border-green-400"
-                      placeholder="Collection ID"
-                      required={index === 0}
-                    />
-                    {formData.collectionIds.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeCollectionField(index)}
-                        className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded"
-                      >
-                        Remove
-                      </button>
-                    )}
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={addCollectionField}
-                  className="bg-green-600 hover:bg-green-700 text-black px-4 py-2 rounded text-sm"
-                >
-                  Add Collection ID
-                </button>
+                <label className="block text-xs font-medium text-white/50 mb-1.5">Treasury Wallet *</label>
+                <input
+                  type="text"
+                  value={formData.treasuryWallet}
+                  onChange={(e) => setFormData({...formData, treasuryWallet: e.target.value})}
+                  className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm focus:outline-none focus:border-violet-500/50 transition-colors"
+                  required
+                />
               </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">Logo URL</label>
-                  <input
-                    type="url"
-                    value={formData.logoUrl}
-                    onChange={(e) => setFormData({...formData, logoUrl: e.target.value})}
-                    className="w-full bg-black border border-green-600 rounded px-3 py-2 text-green-400 focus:outline-none focus:border-green-400"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Background URL</label>
-                  <input
-                    type="url"
-                    value={formData.backgroundUrl}
-                    onChange={(e) => setFormData({...formData, backgroundUrl: e.target.value})}
-                    className="w-full bg-black border border-green-600 rounded px-3 py-2 text-green-400 focus:outline-none focus:border-green-400"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Discord URL</label>
-                  <input
-                    type="url"
-                    value={formData.discordUrl}
-                    onChange={(e) => setFormData({...formData, discordUrl: e.target.value})}
-                    className="w-full bg-black border border-green-600 rounded px-3 py-2 text-green-400 focus:outline-none focus:border-green-400"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">X (Twitter) URL</label>
-                  <input
-                    type="url"
-                    value={formData.xUrl}
-                    onChange={(e) => setFormData({...formData, xUrl: e.target.value})}
-                    className="w-full bg-black border border-green-600 rounded px-3 py-2 text-green-400 focus:outline-none focus:border-green-400"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Magic Eden URL</label>
-                  <input
-                    type="url"
-                    value={formData.magicedenUrl}
-                    onChange={(e) => setFormData({...formData, magicedenUrl: e.target.value})}
-                    className="w-full bg-black border border-green-600 rounded px-3 py-2 text-green-400 focus:outline-none focus:border-green-400"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Website URL</label>
-                  <input
-                    type="url"
-                    value={formData.websiteUrl}
-                    onChange={(e) => setFormData({...formData, websiteUrl: e.target.value})}
-                    className="w-full bg-black border border-green-600 rounded px-3 py-2 text-green-400 focus:outline-none focus:border-green-400"
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-4">
-                <button
-                  type="submit"
-                  className="bg-green-600 hover:bg-green-700 text-black px-6 py-2 rounded-lg font-semibold transition-colors"
-                >
-                  {editingProject ? 'Update Project' : 'Create Project'}
-                </button>
-                <button
-                  type="button"
-                  onClick={resetForm}
-                  className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg font-semibold transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        )}
-
-        {/* Projects List */}
-        <div className="space-y-4">
-          {projects.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-xl text-gray-400">No projects found</p>
-              <p className="text-gray-500 mt-2">Create your first project to get started</p>
             </div>
-          ) : (
-            projects.map((project) => (
-              <div key={project.id} className="bg-gray-900 border border-green-600 rounded-lg p-6">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="text-xl font-bold text-green-400">{project.name}</h3>
-                    {project.description && (
-                      <p className="text-gray-300 mt-2">{project.description}</p>
-                    )}
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => startEdit(project)}
-                      className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition-colors"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDelete(project.id, project.name)}
-                      className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded transition-colors"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="text-gray-400">Treasury Wallet:</span>
-                    <span className="ml-2 font-mono text-green-300">{project.treasuryWallet}</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-400">Collections:</span>
-                    <span className="ml-2">{project.collectionIds.length}</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-400">Seller Fee:</span>
-                    <span className="ml-2">{project.sellerFeeBasisPoints ?? 690} bps ({((project.sellerFeeBasisPoints ?? 690) / 100).toFixed(2)}%)</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-400">Symbol:</span>
-                    <span className="ml-2">{project.collectionSymbol || 'PGV2'}</span>
-                  </div>
-                  {project.creatorAddress && (
-                    <div className="md:col-span-2">
-                      <span className="text-gray-400">Creator Address:</span>
-                      <span className="ml-2 font-mono text-green-300">{project.creatorAddress}</span>
-                    </div>
-                  )}
-                  <div>
-                    <span className="text-gray-400">Created:</span>
-                    <span className="ml-2">{new Date(project.createdAt).toLocaleDateString()}</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-400">Updated:</span>
-                    <span className="ml-2">{new Date(project.updatedAt).toLocaleDateString()}</span>
-                  </div>
-                </div>
 
-                {/* Social Links */}
-                {(project.websiteUrl || project.discordUrl || project.xUrl || project.magicedenUrl) && (
-                  <div className="mt-4 pt-4 border-t border-gray-700">
-                    <span className="text-gray-400 text-sm">Links:</span>
-                    <div className="flex gap-4 mt-2">
-                      {project.websiteUrl && (
-                        <a href={project.websiteUrl} target="_blank" rel="noopener noreferrer" 
-                           className="text-green-400 hover:text-green-300 text-sm">Website</a>
-                      )}
-                      {project.discordUrl && (
-                        <a href={project.discordUrl} target="_blank" rel="noopener noreferrer" 
-                           className="text-green-400 hover:text-green-300 text-sm">Discord</a>
-                      )}
-                      {project.xUrl && (
-                        <a href={project.xUrl} target="_blank" rel="noopener noreferrer" 
-                           className="text-green-400 hover:text-green-300 text-sm">X</a>
-                      )}
-                      {project.magicedenUrl && (
-                        <a href={project.magicedenUrl} target="_blank" rel="noopener noreferrer" 
-                           className="text-green-400 hover:text-green-300 text-sm">Magic Eden</a>
-                      )}
-                    </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-white/50 mb-1.5">Seller Fee Basis Points *</label>
+                <input
+                  type="number"
+                  value={formData.sellerFeeBasisPoints}
+                  onChange={(e) => setFormData({...formData, sellerFeeBasisPoints: parseInt(e.target.value) || 0})}
+                  className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm focus:outline-none focus:border-violet-500/50 transition-colors"
+                  min={0}
+                  max={10000}
+                  required
+                />
+                <p className="text-white/20 text-xs mt-1">{(formData.sellerFeeBasisPoints / 100).toFixed(2)}% royalty (690 = 6.9%)</p>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-white/50 mb-1.5">Collection Symbol *</label>
+                <input
+                  type="text"
+                  value={formData.collectionSymbol}
+                  onChange={(e) => setFormData({...formData, collectionSymbol: e.target.value})}
+                  className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm focus:outline-none focus:border-violet-500/50 transition-colors"
+                  maxLength={20}
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-white/50 mb-1.5">Creator Address</label>
+                <input
+                  type="text"
+                  value={formData.creatorAddress}
+                  onChange={(e) => setFormData({...formData, creatorAddress: e.target.value})}
+                  className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder-white/20 focus:outline-none focus:border-violet-500/50 transition-colors"
+                  placeholder="Falls back to update authority if empty"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-white/50 mb-1.5">Description</label>
+              <textarea
+                value={formData.description}
+                onChange={(e) => setFormData({...formData, description: e.target.value})}
+                className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm focus:outline-none focus:border-violet-500/50 transition-colors"
+                rows={3}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-white/50 mb-1.5">Collection IDs *</label>
+              {formData.collectionIds.map((id, index) => (
+                <div key={index} className="flex gap-2 mb-2">
+                  <input
+                    type="text"
+                    value={id}
+                    onChange={(e) => updateCollectionId(index, e.target.value)}
+                    className="flex-1 px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder-white/20 focus:outline-none focus:border-violet-500/50 transition-colors"
+                    placeholder="Collection ID"
+                    required={index === 0}
+                  />
+                  {formData.collectionIds.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeCollectionField(index)}
+                      className="px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm hover:bg-red-500/20 transition-colors"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={addCollectionField}
+                className="px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white/60 text-xs hover:bg-white/[0.08] transition-colors"
+              >
+                + Add Collection ID
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-white/50 mb-1.5">Logo URL</label>
+                <input type="url" value={formData.logoUrl} onChange={(e) => setFormData({...formData, logoUrl: e.target.value})} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm focus:outline-none focus:border-violet-500/50 transition-colors" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-white/50 mb-1.5">Background URL</label>
+                <input type="url" value={formData.backgroundUrl} onChange={(e) => setFormData({...formData, backgroundUrl: e.target.value})} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm focus:outline-none focus:border-violet-500/50 transition-colors" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-white/50 mb-1.5">Discord URL</label>
+                <input type="url" value={formData.discordUrl} onChange={(e) => setFormData({...formData, discordUrl: e.target.value})} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm focus:outline-none focus:border-violet-500/50 transition-colors" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-white/50 mb-1.5">X (Twitter) URL</label>
+                <input type="url" value={formData.xUrl} onChange={(e) => setFormData({...formData, xUrl: e.target.value})} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm focus:outline-none focus:border-violet-500/50 transition-colors" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-white/50 mb-1.5">Magic Eden URL</label>
+                <input type="url" value={formData.magicedenUrl} onChange={(e) => setFormData({...formData, magicedenUrl: e.target.value})} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm focus:outline-none focus:border-violet-500/50 transition-colors" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-white/50 mb-1.5">Website URL</label>
+                <input type="url" value={formData.websiteUrl} onChange={(e) => setFormData({...formData, websiteUrl: e.target.value})} className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-sm focus:outline-none focus:border-violet-500/50 transition-colors" />
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="submit"
+                className="px-5 py-2 rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-sm font-medium hover:from-violet-500 hover:to-indigo-500 transition-all"
+              >
+                {editingProject ? 'Update Project' : 'Create Project'}
+              </button>
+              <button
+                type="button"
+                onClick={resetForm}
+                className="px-5 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white/60 text-sm hover:bg-white/[0.08] transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Projects List */}
+      <div className="space-y-3">
+        {projects.length === 0 ? (
+          <div className="text-center py-16">
+            <p className="text-white/40">No projects found</p>
+            <p className="text-white/20 text-sm mt-1">Create your first project to get started</p>
+          </div>
+        ) : (
+          projects.map((project) => (
+            <div key={project.id} className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h3 className="text-base font-semibold text-white">{project.name}</h3>
+                  {project.description && (
+                    <p className="text-sm text-white/40 mt-1">{project.description}</p>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => startEdit(project)}
+                    className="px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white/60 text-xs hover:bg-white/[0.08] transition-colors"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDelete(project.id, project.name)}
+                    className="px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs hover:bg-red-500/20 transition-colors"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                <div>
+                  <span className="text-white/30">Treasury:</span>
+                  <span className="ml-2 font-mono text-white/60 text-xs">{project.treasuryWallet}</span>
+                </div>
+                <div>
+                  <span className="text-white/30">Collections:</span>
+                  <span className="ml-2 text-white/60">{project.collectionIds.length}</span>
+                </div>
+                <div>
+                  <span className="text-white/30">Seller Fee:</span>
+                  <span className="ml-2 text-white/60">{project.sellerFeeBasisPoints ?? 690} bps ({((project.sellerFeeBasisPoints ?? 690) / 100).toFixed(2)}%)</span>
+                </div>
+                <div>
+                  <span className="text-white/30">Symbol:</span>
+                  <span className="ml-2 text-white/60">{project.collectionSymbol || 'PGV2'}</span>
+                </div>
+                {project.creatorAddress && (
+                  <div className="md:col-span-2">
+                    <span className="text-white/30">Creator:</span>
+                    <span className="ml-2 font-mono text-white/60 text-xs">{project.creatorAddress}</span>
                   </div>
                 )}
               </div>
-            ))
-          )}
-        </div>
+
+              {(project.websiteUrl || project.discordUrl || project.xUrl || project.magicedenUrl) && (
+                <div className="mt-4 pt-3 border-t border-white/[0.06] flex gap-3">
+                  {project.websiteUrl && (
+                    <a href={project.websiteUrl} target="_blank" rel="noopener noreferrer" className="text-violet-400 hover:text-violet-300 text-xs">Website</a>
+                  )}
+                  {project.discordUrl && (
+                    <a href={project.discordUrl} target="_blank" rel="noopener noreferrer" className="text-violet-400 hover:text-violet-300 text-xs">Discord</a>
+                  )}
+                  {project.xUrl && (
+                    <a href={project.xUrl} target="_blank" rel="noopener noreferrer" className="text-violet-400 hover:text-violet-300 text-xs">X</a>
+                  )}
+                  {project.magicedenUrl && (
+                    <a href={project.magicedenUrl} target="_blank" rel="noopener noreferrer" className="text-violet-400 hover:text-violet-300 text-xs">Magic Eden</a>
+                  )}
+                </div>
+              )}
+            </div>
+          ))
+        )}
       </div>
-    </div>
+    </>
   );
 }

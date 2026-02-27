@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import AdminNavigation from '@/components/admin/AdminNavigation';
 import LayerOrderManager from '@/components/admin/LayerOrderManager';
 import TraitCategoryManager from '@/components/admin/TraitCategoryManager';
 import { TraitUploadService, type TraitUploadFile, type BulkUploadSettings } from '@/lib/services/trait-upload';
@@ -1039,38 +1038,36 @@ export default function TraitsManagerPage() {
   });
 
   return (
-    <div className="min-h-screen bg-black text-green-400">
-      <AdminNavigation />
-      <div className="p-6">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-green-400">🎨 Comprehensive Trait Manager</h1>
-          <p className="mt-2 text-gray-400">
-            Manage layer order, categories, individual traits, and bulk uploads
-          </p>
+    <>
+      <div className="mb-8">
+        <h1 className="text-2xl font-semibold text-white tracking-tight">Traits Manager</h1>
+        <p className="mt-1 text-sm text-white/40">
+          Manage layer order, categories, individual traits, and bulk uploads
+        </p>
+      </div>
+
+      {error && (
+        <div className="mb-4 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+          {error}
         </div>
+      )}
 
-        {error && (
-          <div className="mb-4 bg-red-900 border border-red-700 text-red-300 px-4 py-3 rounded">
-            ⚠️ {error}
-          </div>
-        )}
-
-        {/* Tab Navigation */}
-        <div className="mb-6 border-b border-gray-700">
-          <nav className="flex space-x-8">
+      {/* Tab Navigation */}
+      <div className="mb-6 border-b border-white/[0.06]">
+        <nav className="flex space-x-6">
             {[
-              { id: 'layers', label: '📋 Layer Order', icon: '📋' },
-              { id: 'categories', label: '🏷️ Categories', icon: '🏷️' },
-              { id: 'traits', label: '🎨 Manage Traits', icon: '🎨' },
-              { id: 'bulk', label: '📁 Bulk Upload', icon: '📁' },
+              { id: 'layers', label: 'Layer Order' },
+              { id: 'categories', label: 'Categories' },
+              { id: 'traits', label: 'Manage Traits' },
+              { id: 'bulk', label: 'Bulk Upload' },
             ].map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
                 className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
                   activeTab === tab.id
-                    ? 'border-green-500 text-green-400'
-                    : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
+                    ? 'border-violet-500 text-white'
+                    : 'border-transparent text-white/40 hover:text-white/60 hover:border-white/20'
                 }`}
               >
                 {tab.label}
@@ -1973,7 +1970,6 @@ export default function TraitsManagerPage() {
             </div>
           </div>
         )}
-      </div>
-    </div>
+    </>
   );
 }

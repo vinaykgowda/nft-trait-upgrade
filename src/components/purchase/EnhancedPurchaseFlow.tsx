@@ -123,7 +123,21 @@ export function EnhancedPurchaseFlow({ selectedNFT, selectedTraits, onSuccess, o
     if (!voucherValid) return;
 
     try {
-      updateState({ step: 'metadata_updating', progress: 30 });
+      updateState({ step: 'metadata_updating', progress: 10 });
+
+      // Redeem the voucher FIRST — if this fails, don't apply any traits
+      const redeemRes = await fetch('/api/user/vouchers/redeem-by-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ voucherId: voucherValid.id, walletAddress: publicKey.toString(), voucherCode: voucherCode.toUpperCase() }),
+      });
+      if (!redeemRes.ok) {
+        const redeemErr = await redeemRes.json().catch(() => ({}));
+        console.error('Voucher redeem failed:', redeemRes.status, redeemErr);
+        throw new Error(redeemErr.error || 'Failed to redeem voucher');
+      }
+
+      updateState({ progress: 30 });
 
       // Compose image
       const composeResponse = await fetch('/api/compose-image', {
@@ -164,7 +178,7 @@ export function EnhancedPurchaseFlow({ selectedNFT, selectedTraits, onSuccess, o
         slotMapping = slotsData.data?.reduce((acc: Record<string, string>, slot: any) => { acc[slot.id] = slot.name; return acc; }, {}) || {};
       }
 
-      // Update metadata on-chain (no payment tx signature needed)
+      // Update metadata on-chain
       const metadataResponse = await fetch('/api/tx/update-metadata', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -185,19 +199,7 @@ export function EnhancedPurchaseFlow({ selectedNFT, selectedTraits, onSuccess, o
         throw new Error(errData.message || errData.error || 'Failed to update metadata on-chain');
       }
 
-      updateState({ step: 'metadata_updated', progress: 85 });
-
-      // Redeem the voucher (mark as used) — must succeed
-      const redeemRes = await fetch('/api/user/vouchers/redeem-by-code', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ voucherId: voucherValid.id, walletAddress: publicKey.toString(), voucherCode: voucherCode.toUpperCase() }),
-      });
-      if (!redeemRes.ok) {
-        const redeemErr = await redeemRes.json().catch(() => ({}));
-        console.error('Voucher redeem failed:', redeemRes.status, redeemErr);
-        throw new Error(redeemErr.error || 'Failed to mark voucher as redeemed');
-      }
+      updateState({ step: 'metadata_updated', progress: 90 });
 
       if (onSuccess) onSuccess('voucher-' + voucherValid.id, newImageUrl);
       await new Promise(r => setTimeout(r, 1500));

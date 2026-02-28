@@ -4,7 +4,7 @@ import { AppWalletProvider } from "@/components/wallet/WalletProvider";
 
 export const metadata: Metadata = {
   title: "Pepeverse Trait Forge",
-  description: "Secure trait commerce for Metaplex Core NFTs",
+  description: "Secure in-house trait swap store aka Trait Forge built by and for Pepeverse!",
   icons: {
     icon: "/trait-forge-logo.png",
     apple: "/trait-forge-logo.png",

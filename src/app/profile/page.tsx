@@ -47,7 +47,7 @@ export default function ProfilePage() {
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
   const [nfts, setNfts] = useState<NFT[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<'wallets' | 'nfts' | 'vouchers' | 'servers'>('wallets');
+  const [tab, setTab] = useState<'wallets' | 'nfts' | 'vouchers'>('wallets');
   const [walletLabel, setWalletLabel] = useState('');
   const [linkingWallet, setLinkingWallet] = useState(false);
   const [nftsLoading, setNftsLoading] = useState(false);
@@ -134,6 +134,19 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-[#0f1117] text-white">
+      {/* Top nav bar */}
+      <div className="border-b border-white/[0.06] bg-white/[0.02]">
+        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+          <a href="/marketplace" className="flex items-center gap-2 text-white/60 hover:text-white transition text-sm">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Back to Trait Forge
+          </a>
+          <button onClick={handleLogout} className="text-sm text-white/40 hover:text-red-400 transition">Logout</button>
+        </div>
+      </div>
+
       <div className="max-w-5xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
@@ -150,20 +163,18 @@ export default function ProfilePage() {
               <p className="text-white/40 text-sm">@{profile.discordUsername}</p>
             </div>
           </div>
-          <button onClick={handleLogout} className="text-sm text-white/40 hover:text-red-400 transition">Logout</button>
         </div>
 
         {/* Tabs */}
         <div className="flex gap-1 mb-6 bg-white/[0.04] rounded-lg p-1 w-fit">
-          {(['wallets', 'nfts', 'vouchers', 'servers'] as const).map(t => (
+          {(['wallets', 'nfts', 'vouchers'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)}
               className={`px-4 py-2 rounded-md text-sm font-medium transition ${
                 tab === t ? 'bg-violet-600 text-white' : 'text-white/50 hover:text-white'
               }`}>
               {t === 'wallets' ? `Wallets (${wallets.length})` :
                t === 'nfts' ? `Collection NFTs (${nfts.length})` :
-               t === 'vouchers' ? `Vouchers (${vouchers.length})` :
-               `Servers (${profile.discordServers?.length || 0})`}
+               `Vouchers (${vouchers.length})`}
             </button>
           ))}
         </div>
@@ -262,26 +273,6 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* Servers Tab */}
-        {tab === 'servers' && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {(profile.discordServers || []).map(s => (
-              <div key={s.id} className="bg-white/[0.04] rounded-xl p-4 border border-white/[0.06] flex items-center gap-3">
-                {s.icon ? (
-                  <img src={`https://cdn.discordapp.com/icons/${s.id}/${s.icon}.png`} alt="" className="w-10 h-10 rounded-full" />
-                ) : (
-                  <div className="w-10 h-10 rounded-full bg-white/[0.1] flex items-center justify-center text-xs text-white/40">
-                    {s.name[0]}
-                  </div>
-                )}
-                <span className="text-white text-sm truncate">{s.name}</span>
-              </div>
-            ))}
-            {(!profile.discordServers || profile.discordServers.length === 0) && (
-              <p className="text-white/30 text-sm col-span-full text-center py-8">No servers found.</p>
-            )}
-          </div>
-        )}
       </div>
     </div>
   );

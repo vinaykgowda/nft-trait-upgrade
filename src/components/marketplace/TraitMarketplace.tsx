@@ -89,21 +89,37 @@ export function TraitMarketplace() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Auto-fetch profile when wallet connects
-  const fetchProfileByWallet = useCallback(async (walletAddress: string) => {
+  // Auto-fetch profile when wallet connects or user is logged in
+  const fetchProfile = useCallback(async (walletAddress?: string) => {
     setProfileLoading(true);
     try {
-      const res = await fetch(`/api/user/profile-by-wallet?wallet=${walletAddress}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.profile) {
-          setUserProfile(data.profile);
-          setLinkedWallets(data.wallets || []);
-        } else {
-          setUserProfile(null);
-          setLinkedWallets([]);
+      // First try session-based lookup (user already logged in via Discord)
+      const sessionRes = await fetch('/api/user/profile');
+      if (sessionRes.ok) {
+        const sessionData = await sessionRes.json();
+        if (sessionData.profile) {
+          setUserProfile(sessionData.profile);
+          setLinkedWallets(sessionData.wallets || []);
+          setProfileLoading(false);
+          return;
         }
       }
+
+      // Fallback: try wallet-based lookup
+      if (walletAddress) {
+        const res = await fetch(`/api/user/profile-by-wallet?wallet=${walletAddress}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.profile) {
+            setUserProfile(data.profile);
+            setLinkedWallets(data.wallets || []);
+            return;
+          }
+        }
+      }
+
+      setUserProfile(null);
+      setLinkedWallets([]);
     } catch (err) {
       console.error('Failed to fetch profile:', err);
     } finally {
@@ -113,14 +129,18 @@ export function TraitMarketplace() {
 
   useEffect(() => {
     if (connected && publicKey) {
-      fetchProfileByWallet(publicKey.toString());
+      fetchProfile(publicKey.toString());
     } else {
-      setUserProfile(null);
-      setLinkedWallets([]);
+      // Still check session even without wallet (user might be logged in)
+      fetchProfile();
     }
-  }, [connected, publicKey, fetchProfileByWallet]);
+  }, [connected, publicKey, fetchProfile]);
 
   const handleDiscordConnect = () => {
+    // Store the current wallet address in a cookie so the callback can auto-link it
+    if (publicKey) {
+      document.cookie = `pending-link-wallet=${publicKey.toString()};path=/;max-age=300;samesite=lax`;
+    }
     const returnUrl = window.location.href;
     window.location.href = `/api/auth/discord?returnUrl=${encodeURIComponent(returnUrl)}`;
   };

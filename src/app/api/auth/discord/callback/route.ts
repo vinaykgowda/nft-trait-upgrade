@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { UserProfileRepository } from '@/lib/repositories/user-profiles';
+import { UserLinkedWalletRepository } from '@/lib/repositories/user-linked-wallets';
 import { UserSessionService } from '@/lib/auth/user-session';
 
 export const dynamic = 'force-dynamic';
@@ -74,6 +75,20 @@ export async function GET(request: NextRequest) {
       discordAvatar: profile.discord_avatar,
     });
 
+    // Auto-link the wallet that was connected when user initiated Discord OAuth
+    const pendingWallet = request.cookies.get('pending-link-wallet')?.value;
+    if (pendingWallet && pendingWallet.length >= 32) {
+      try {
+        const walletRepo = new UserLinkedWalletRepository();
+        const existing = await walletRepo.findByWalletAddress(pendingWallet);
+        if (!existing) {
+          await walletRepo.linkWallet(profile.id, pendingWallet);
+        }
+      } catch (err) {
+        console.error('Auto-link wallet failed:', err);
+      }
+    }
+
     const response = NextResponse.redirect(new URL(
       request.cookies.get('discord-oauth-return')?.value || '/profile',
       request.url
@@ -82,6 +97,7 @@ export async function GET(request: NextRequest) {
     // Clear OAuth cookies
     response.cookies.set('discord-oauth-state', '', { maxAge: 0, path: '/' });
     response.cookies.set('discord-oauth-return', '', { maxAge: 0, path: '/' });
+    response.cookies.set('pending-link-wallet', '', { maxAge: 0, path: '/' });
     return response;
   } catch (error) {
     console.error('Discord OAuth callback error:', error);

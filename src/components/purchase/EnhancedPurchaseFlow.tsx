@@ -191,11 +191,12 @@ export function EnhancedPurchaseFlow({ selectedNFT, selectedTraits, onSuccess, o
       const redeemRes = await fetch('/api/user/vouchers/redeem-by-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ voucherId: voucherValid.id, walletAddress: publicKey.toString() }),
+        body: JSON.stringify({ voucherId: voucherValid.id, walletAddress: publicKey.toString(), voucherCode: voucherCode.toUpperCase() }),
       });
       if (!redeemRes.ok) {
         const redeemErr = await redeemRes.json().catch(() => ({}));
         console.error('Voucher redeem failed:', redeemRes.status, redeemErr);
+        throw new Error(redeemErr.error || 'Failed to mark voucher as redeemed');
       }
 
       if (onSuccess) onSuccess('voucher-' + voucherValid.id, newImageUrl);

@@ -9,13 +9,14 @@ export const dynamic = 'force-dynamic';
 const schema = z.object({
   voucherId: z.string().uuid(),
   walletAddress: z.string().min(32).max(44),
+  voucherCode: z.string().length(12).optional(),
 });
 
-// Redeem a voucher after successful trait upgrade — works with session OR wallet-based auth
+// Redeem a voucher after successful trait upgrade — works with session, wallet-based auth, or code knowledge
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { voucherId, walletAddress } = schema.parse(body);
+    const { voucherId, walletAddress, voucherCode } = schema.parse(body);
 
     const voucherRepo = new TraitVoucherRepository();
     const voucher = await voucherRepo.findById(voucherId);
@@ -23,16 +24,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Voucher not found' }, { status: 404 });
     }
 
-    // Auth: check session first, then wallet ownership
+    // Auth: check session first, then wallet ownership, then code knowledge
     let authorized = false;
     const session = await UserSessionService.getSessionFromCookies();
     if (session && session.userId === (voucher as any).user_id) {
       authorized = true;
-    } else {
-      // Check if wallet is linked to the voucher's user
+    }
+
+    if (!authorized) {
       const walletRepo = new UserLinkedWalletRepository();
       const linked = await walletRepo.findByWalletAddress(walletAddress);
       if (linked && linked.user_id === (voucher as any).user_id) {
+        authorized = true;
+      }
+    }
+
+    // If the caller knows the voucher code, they already proved ownership at apply time
+    if (!authorized && voucherCode) {
+      if ((voucher as any).code === voucherCode) {
         authorized = true;
       }
     }

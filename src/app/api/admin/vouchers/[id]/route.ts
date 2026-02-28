@@ -32,7 +32,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     const body = await request.json();
     const updates = updateVoucherSchema.parse(body);
 
-    const updateData: Record<string, any> = { updated_at: new Date() };
+    const updateData: Record<string, any> = {};
     if (updates.userId) updateData.user_id = updates.userId;
     if (updates.traitId) updateData.trait_id = updates.traitId;
     if (updates.slotId) updateData.slot_id = updates.slotId;

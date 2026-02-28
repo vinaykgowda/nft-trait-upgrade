@@ -128,7 +128,7 @@ export class TraitVoucherRepository extends BaseRepository<TraitVoucherRow> {
     return this.findWithDetails({ userId, status: 'active' }, client);
   }
 
-  async redeemVoucher(id: string, purchaseId: string, client?: PoolClient): Promise<TraitVoucherRow | null> {
+  async redeemVoucher(id: string, purchaseId: string | null, client?: PoolClient): Promise<TraitVoucherRow | null> {
     const queryText = `
       UPDATE ${this.tableName}
       SET status = 'redeemed', redeemed_at = NOW(), redeemed_purchase_id = $2, updated_at = NOW()

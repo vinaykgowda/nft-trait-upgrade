@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Not authorized to redeem this voucher' }, { status: 403 });
     }
 
-    const redeemed = await voucherRepo.redeemVoucher(voucherId, voucherId);
+    const redeemed = await voucherRepo.redeemVoucher(voucherId, null);
     if (!redeemed) {
       return NextResponse.json({ error: 'Voucher already used or revoked' }, { status: 400 });
     }

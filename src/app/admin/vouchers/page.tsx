@@ -47,7 +47,7 @@ export default function VouchersPage() {
 
   // Edit state
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ slotId: '', rarityTierId: '', traitId: '', userId: '' });
+  const [editForm, setEditForm] = useState({ slotId: '', rarityTierId: '', traitId: '', userId: '', status: '' });
 
   const fetchVouchers = useCallback(async () => {
     const params = new URLSearchParams();
@@ -146,6 +146,7 @@ export default function VouchersPage() {
       rarityTierId: trait?.rarity_tier_id || '',
       traitId: trait?.id || '',
       userId: v.user_id,
+      status: v.status,
     });
   };
 
@@ -326,7 +327,12 @@ export default function VouchersPage() {
                           </select>
                         </td>
                         <td className="px-4 py-3">
-                          <span className="text-green-400 text-xs">{v.status}</span>
+                          <select value={editForm.status} onChange={e => setEditForm({ ...editForm, status: e.target.value })}
+                            className="bg-white/[0.06] border border-white/[0.1] rounded px-2 py-1 text-white text-xs">
+                            <option value="active">active</option>
+                            <option value="redeemed">redeemed</option>
+                            <option value="revoked">revoked</option>
+                          </select>
                         </td>
                         <td className="px-4 py-3 text-white/40">{new Date(v.created_at).toLocaleDateString()}</td>
                         <td className="px-4 py-3 text-right space-x-2">
@@ -350,11 +356,9 @@ export default function VouchersPage() {
                         </td>
                         <td className="px-4 py-3 text-white/40 text-xs">{new Date(v.created_at).toLocaleDateString()}</td>
                         <td className="px-4 py-3 text-right space-x-2">
+                          <button onClick={() => startEdit(v)} className="text-violet-400 hover:text-violet-300 text-xs">Edit</button>
                           {v.status === 'active' && (
-                            <>
-                              <button onClick={() => startEdit(v)} className="text-violet-400 hover:text-violet-300 text-xs">Edit</button>
-                              <button onClick={() => handleDelete(v.id)} className="text-red-400 hover:text-red-300 text-xs">Revoke</button>
-                            </>
+                            <button onClick={() => handleDelete(v.id)} className="text-red-400 hover:text-red-300 text-xs">Revoke</button>
                           )}
                         </td>
                       </>

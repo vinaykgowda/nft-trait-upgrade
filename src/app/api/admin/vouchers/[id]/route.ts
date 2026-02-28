@@ -11,6 +11,7 @@ const updateVoucherSchema = z.object({
   traitId: z.string().uuid().optional(),
   slotId: z.string().uuid().optional(),
   rarityTierId: z.string().uuid().optional(),
+  status: z.enum(['active', 'redeemed', 'revoked']).optional(),
 });
 
 // Update voucher
@@ -28,10 +29,6 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     if (!existing) {
       return NextResponse.json({ error: 'Voucher not found' }, { status: 404 });
     }
-    if ((existing as any).status !== 'active') {
-      return NextResponse.json({ error: 'Can only edit active vouchers' }, { status: 400 });
-    }
-
     const body = await request.json();
     const updates = updateVoucherSchema.parse(body);
 
@@ -40,6 +37,15 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     if (updates.traitId) updateData.trait_id = updates.traitId;
     if (updates.slotId) updateData.slot_id = updates.slotId;
     if (updates.rarityTierId) updateData.rarity_tier_id = updates.rarityTierId;
+    if (updates.status) {
+      updateData.status = updates.status;
+      if (updates.status === 'redeemed') {
+        updateData.redeemed_at = new Date();
+      } else if (updates.status === 'active') {
+        updateData.redeemed_at = null;
+        updateData.redeemed_purchase_id = null;
+      }
+    }
 
     const updated = await voucherRepo.update(params.id, updateData);
 

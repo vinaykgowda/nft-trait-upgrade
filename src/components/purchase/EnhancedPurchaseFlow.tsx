@@ -70,34 +70,141 @@ export function EnhancedPurchaseFlow({ selectedNFT, selectedTraits, onSuccess, o
 
   const paymentGroups = getPaymentGroups();
   const isMixed = paymentGroups.length > 1;
-  const totalDisplay = paymentGroups.map(g => `${g.amount} ${g.token}`).join(' + ');
+  const isVoucherMode = !!voucherValid;
+  const totalDisplay = isVoucherMode ? 'FREE (Voucher)' : paymentGroups.map(g => `${g.amount} ${g.token}`).join(' + ');
 
   const updateState = (updates: Partial<PurchaseState>) => setState(prev => ({ ...prev, ...updates }));
 
   const handleApplyVoucher = async () => {
     if (!voucherCode || voucherCode.length !== 12) return;
+
+    // Enforce: voucher only works with a single trait selected
+    if (traits.length > 1) {
+      setVoucherError('Vouchers can only be used with a single trait. Remove other traits first.');
+      return;
+    }
+
     setVoucherChecking(true);
     setVoucherError('');
     setVoucherValid(null);
     try {
-      // Try applying voucher against each selected trait
-      for (const trait of traits) {
-        const res = await fetch('/api/user/vouchers/apply', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code: voucherCode.toUpperCase(), traitId: trait.id }),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setVoucherValid({ id: data.voucher.id, traitName: data.voucher.traitName, slotName: data.voucher.slotName });
-          return;
-        }
+      const trait = traits[0];
+      const res = await fetch('/api/user/vouchers/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: voucherCode.toUpperCase(), traitId: trait.id }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setVoucherValid({ id: data.voucher.id, traitName: data.voucher.traitName, slotName: data.voucher.slotName });
+      } else {
+        const errData = await res.json();
+        setVoucherError(errData.error || 'Voucher does not match the selected trait');
       }
-      setVoucherError('Voucher does not match any selected trait');
     } catch {
       setVoucherError('Failed to validate voucher');
     } finally {
       setVoucherChecking(false);
+    }
+  };
+
+  const handleRemoveVoucher = () => {
+    setVoucherValid(null);
+    setVoucherCode('');
+    setVoucherError('');
+  };
+
+  // Voucher-only flow: skip payment, go straight to metadata update
+  const handleVoucherPurchase = async () => {
+    if (!publicKey) {
+      updateState({ step: 'error', error: 'Wallet not connected' });
+      return;
+    }
+    if (!voucherValid) return;
+
+    try {
+      updateState({ step: 'metadata_updating', progress: 30 });
+
+      // Compose image
+      const composeResponse = await fetch('/api/compose-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          baseImageUrl: selectedNFT.image,
+          selectedTraits: selectedTraits,
+          assetId: selectedNFT.address,
+          width: 1500, height: 1500, format: 'webp', quality: 90
+        })
+      });
+
+      let newImageUrl = selectedNFT.image;
+      if (composeResponse.ok) {
+        const { imageBuffer } = await composeResponse.json();
+        const uploadResponse = await fetch('/api/upload-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageBuffer, contentType: 'image/webp', assetId: selectedNFT.address, traits: Object.values(selectedTraits) })
+        });
+        if (uploadResponse.ok) {
+          const { imageUrl } = await uploadResponse.json();
+          newImageUrl = imageUrl;
+        } else {
+          const errorData = await uploadResponse.json();
+          throw new Error(`Image upload failed: ${errorData.error || 'Unknown error'}`);
+        }
+      }
+
+      updateState({ updatedImageUrl: newImageUrl, progress: 60 });
+
+      // Get slot mapping
+      const slotMappingResponse = await fetch('/api/trait-slots');
+      let slotMapping: Record<string, string> = {};
+      if (slotMappingResponse.ok) {
+        const slotsData = await slotMappingResponse.json();
+        slotMapping = slotsData.data?.reduce((acc: Record<string, string>, slot: any) => { acc[slot.id] = slot.name; return acc; }, {}) || {};
+      }
+
+      // Update metadata on-chain (no payment tx signature needed)
+      const metadataResponse = await fetch('/api/tx/update-metadata', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          walletAddress: publicKey.toString(),
+          assetId: selectedNFT.address,
+          newImageUrl,
+          newAttributes: Object.values(selectedTraits).map(trait => ({
+            trait_type: slotMapping[trait.slotId] || trait.slotId,
+            value: trait.name
+          })),
+          txSignature: 'voucher-redemption'
+        })
+      });
+
+      if (!metadataResponse.ok) {
+        const errData = await metadataResponse.json();
+        throw new Error(errData.message || errData.error || 'Failed to update metadata on-chain');
+      }
+
+      updateState({ step: 'metadata_updated', progress: 85 });
+
+      // Redeem the voucher (mark as used)
+      try {
+        await fetch('/api/user/vouchers/redeem', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ voucherId: voucherValid.id, purchaseId: voucherValid.id }),
+        });
+      } catch (err) {
+        console.error('Voucher redeem call failed (non-blocking):', err);
+      }
+
+      if (onSuccess) onSuccess('voucher-' + voucherValid.id, newImageUrl);
+      await new Promise(r => setTimeout(r, 1500));
+      updateState({ step: 'success', progress: 100, txSignature: 'voucher-' + voucherValid.id });
+
+    } catch (error) {
+      console.error('Voucher purchase error:', error);
+      updateState({ step: 'error', error: error instanceof Error ? error.message : 'Voucher redemption failed' });
     }
   };
 
@@ -339,53 +446,78 @@ export function EnhancedPurchaseFlow({ selectedNFT, selectedTraits, onSuccess, o
 
               {/* Payment Summary */}
               <div className="border-t border-gray-200 pt-4 space-y-2">
-                {paymentGroups.map((group, i) => (
-                  <div key={i} className="flex justify-between items-center">
-                    <span className="text-gray-600">{group.token} Payment ({group.traits.length} trait{group.traits.length > 1 ? 's' : ''})</span>
-                    <span className="font-medium text-gray-900">{group.amount} {group.token}</span>
+                {isVoucherMode ? (
+                  <div className="flex justify-between items-center">
+                    <span className="text-lg font-semibold text-gray-900">Total</span>
+                    <span className="text-lg font-semibold text-green-600">FREE (Voucher)</span>
                   </div>
-                ))}
-                <div className="flex justify-between items-center border-t pt-2">
-                  <span className="text-lg font-semibold text-gray-900">Total</span>
-                  <span className="text-lg font-semibold text-gray-900">{totalDisplay}</span>
-                </div>
-                {isMixed && (
-                  <p className="text-sm text-amber-600">
-                    All payments are bundled into a single transaction — one signature only.
-                  </p>
+                ) : (
+                  <>
+                    {paymentGroups.map((group, i) => (
+                      <div key={i} className="flex justify-between items-center">
+                        <span className="text-gray-600">{group.token} Payment ({group.traits.length} trait{group.traits.length > 1 ? 's' : ''})</span>
+                        <span className="font-medium text-gray-900">{group.amount} {group.token}</span>
+                      </div>
+                    ))}
+                    <div className="flex justify-between items-center border-t pt-2">
+                      <span className="text-lg font-semibold text-gray-900">Total</span>
+                      <span className="text-lg font-semibold text-gray-900">{totalDisplay}</span>
+                    </div>
+                    {isMixed && (
+                      <p className="text-sm text-amber-600">
+                        All payments are bundled into a single transaction — one signature only.
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
 
               {/* Voucher Code */}
               <div className="border-t border-gray-200 pt-4">
-                <p className="text-sm text-gray-600 mb-2">Have a voucher code?</p>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={voucherCode}
-                    onChange={e => { setVoucherCode(e.target.value.toUpperCase()); setVoucherError(''); setVoucherValid(null); }}
-                    placeholder="Enter 12-digit code"
-                    maxLength={12}
-                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono uppercase"
-                  />
-                  <button
-                    onClick={handleApplyVoucher}
-                    disabled={voucherCode.length !== 12 || voucherChecking}
-                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 disabled:opacity-40 rounded-lg text-sm font-medium transition"
-                  >
-                    {voucherChecking ? '...' : 'Apply'}
-                  </button>
-                </div>
-                {voucherValid && (
-                  <p className="text-green-600 text-sm mt-1">
-                    ✓ Voucher applied for {voucherValid.slotName} → {voucherValid.traitName} (free)
-                  </p>
+                {isVoucherMode ? (
+                  <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <div>
+                      <p className="text-green-700 text-sm font-medium">
+                        ✓ Voucher applied: {voucherValid!.slotName} → {voucherValid!.traitName}
+                      </p>
+                      <p className="text-green-600 text-xs mt-0.5">No payment required</p>
+                    </div>
+                    <button onClick={handleRemoveVoucher} className="text-red-500 hover:text-red-700 text-xs font-medium">Remove</button>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-sm text-gray-600 mb-2">Have a voucher code?</p>
+                    {traits.length > 1 && (
+                      <p className="text-xs text-amber-600 mb-2">Vouchers can only be used with a single trait selected.</p>
+                    )}
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={voucherCode}
+                        onChange={e => { setVoucherCode(e.target.value.toUpperCase()); setVoucherError(''); }}
+                        placeholder="XVXN7985QDNR"
+                        maxLength={12}
+                        disabled={traits.length > 1}
+                        className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono uppercase disabled:opacity-40"
+                      />
+                      <button
+                        onClick={handleApplyVoucher}
+                        disabled={voucherCode.length !== 12 || voucherChecking || traits.length > 1}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:text-gray-500 text-white rounded-lg text-sm font-medium transition"
+                      >
+                        {voucherChecking ? '...' : 'Apply'}
+                      </button>
+                    </div>
+                    {voucherError && <p className="text-red-500 text-sm mt-1">{voucherError}</p>}
+                  </>
                 )}
-                {voucherError && <p className="text-red-500 text-sm mt-1">{voucherError}</p>}
               </div>
 
-              <button onClick={handlePurchase} className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors">
-                {voucherValid ? `Purchase (voucher applied)` : `Purchase for ${totalDisplay}`}
+              <button
+                onClick={isVoucherMode ? handleVoucherPurchase : handlePurchase}
+                className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+              >
+                {isVoucherMode ? 'Apply Voucher & Upgrade' : `Purchase for ${totalDisplay}`}
               </button>
             </div>
           )}
@@ -419,17 +551,17 @@ export function EnhancedPurchaseFlow({ selectedNFT, selectedTraits, onSuccess, o
                   <p className="text-sm text-gray-600 mt-2">Your NFT has been upgraded with {traits.length} new trait{traits.length > 1 ? 's' : ''}!</p>
                 </div>
               )}
-              {state.txSignature && (
-                <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left">
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Payment:</span>
-                      <span className="font-medium">{totalDisplay}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Traits Applied:</span>
-                      <span className="font-medium">{traits.length}</span>
-                    </div>
+              <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left">
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Payment:</span>
+                    <span className="font-medium">{state.txSignature?.startsWith('voucher-') ? 'FREE (Voucher)' : totalDisplay}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Traits Applied:</span>
+                    <span className="font-medium">{traits.length}</span>
+                  </div>
+                  {state.txSignature && !state.txSignature.startsWith('voucher-') && (
                     <div className="pt-2 border-t border-gray-200">
                       <p className="text-xs text-gray-600 mb-1">Transaction Signature:</p>
                       <p className="text-xs font-mono text-gray-800 break-all">{state.txSignature}</p>
@@ -437,9 +569,9 @@ export function EnhancedPurchaseFlow({ selectedNFT, selectedTraits, onSuccess, o
                         View on Solana Explorer →
                       </a>
                     </div>
-                  </div>
+                  )}
                 </div>
-              )}
+              </div>
               <button onClick={onCancel} className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors">Continue Shopping</button>
             </div>
           )}

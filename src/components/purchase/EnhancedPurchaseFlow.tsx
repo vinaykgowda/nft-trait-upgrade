@@ -48,6 +48,12 @@ export function EnhancedPurchaseFlow({ selectedNFT, selectedTraits, onSuccess, o
     step: 'confirm', progress: 0, paymentToken: 'SOL', totalAmount: 0
   });
 
+  // Voucher state
+  const [voucherCode, setVoucherCode] = useState('');
+  const [voucherValid, setVoucherValid] = useState<{ id: string; traitName: string; slotName: string } | null>(null);
+  const [voucherError, setVoucherError] = useState('');
+  const [voucherChecking, setVoucherChecking] = useState(false);
+
   const traits = Object.values(selectedTraits);
 
   // Group traits by payment token
@@ -67,6 +73,33 @@ export function EnhancedPurchaseFlow({ selectedNFT, selectedTraits, onSuccess, o
   const totalDisplay = paymentGroups.map(g => `${g.amount} ${g.token}`).join(' + ');
 
   const updateState = (updates: Partial<PurchaseState>) => setState(prev => ({ ...prev, ...updates }));
+
+  const handleApplyVoucher = async () => {
+    if (!voucherCode || voucherCode.length !== 12) return;
+    setVoucherChecking(true);
+    setVoucherError('');
+    setVoucherValid(null);
+    try {
+      // Try applying voucher against each selected trait
+      for (const trait of traits) {
+        const res = await fetch('/api/user/vouchers/apply', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: voucherCode.toUpperCase(), traitId: trait.id }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setVoucherValid({ id: data.voucher.id, traitName: data.voucher.traitName, slotName: data.voucher.slotName });
+          return;
+        }
+      }
+      setVoucherError('Voucher does not match any selected trait');
+    } catch {
+      setVoucherError('Failed to validate voucher');
+    } finally {
+      setVoucherChecking(false);
+    }
+  };
 
   const handlePurchase = async () => {
     if (!publicKey || !signTransaction) {
@@ -323,8 +356,36 @@ export function EnhancedPurchaseFlow({ selectedNFT, selectedTraits, onSuccess, o
                 )}
               </div>
 
+              {/* Voucher Code */}
+              <div className="border-t border-gray-200 pt-4">
+                <p className="text-sm text-gray-600 mb-2">Have a voucher code?</p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={voucherCode}
+                    onChange={e => { setVoucherCode(e.target.value.toUpperCase()); setVoucherError(''); setVoucherValid(null); }}
+                    placeholder="Enter 12-digit code"
+                    maxLength={12}
+                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono uppercase"
+                  />
+                  <button
+                    onClick={handleApplyVoucher}
+                    disabled={voucherCode.length !== 12 || voucherChecking}
+                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 disabled:opacity-40 rounded-lg text-sm font-medium transition"
+                  >
+                    {voucherChecking ? '...' : 'Apply'}
+                  </button>
+                </div>
+                {voucherValid && (
+                  <p className="text-green-600 text-sm mt-1">
+                    ✓ Voucher applied for {voucherValid.slotName} → {voucherValid.traitName} (free)
+                  </p>
+                )}
+                {voucherError && <p className="text-red-500 text-sm mt-1">{voucherError}</p>}
+              </div>
+
               <button onClick={handlePurchase} className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors">
-                Purchase for {totalDisplay}
+                {voucherValid ? `Purchase (voucher applied)` : `Purchase for ${totalDisplay}`}
               </button>
             </div>
           )}

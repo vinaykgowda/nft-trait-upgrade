@@ -1,0 +1,134 @@
+The ONE Dangerous Bug: Memo Fallback
+
+You said:
+
+if updateV1 fails, fallback to memo instruction instead
+
+This is NOT SAFE for your upgrade store.
+
+Because:
+
+memo ≠ metadata update
+
+So worst case:
+
+User pays
+
+Image + metadata uploaded
+
+Transaction succeeds (memo)
+
+BUT NFT URI never changes
+
+User sees no upgrade → trust broken 💀
+
+This is a silent data integrity failure.
+
+❗ Why This Fallback Is Dangerous
+
+From a blockchain perspective:
+
+Memo instruction always succeeds
+
+updateV1 might fail due to:
+
+wrong authority
+
+delegate mismatch
+
+asset frozen / immutable
+
+invalid newUri
+
+missing collection authority
+
+If fallback executes:
+
+You get a SUCCESS tx that does NOTHING.
+
+That’s worse than failing loudly.
+
+🧠 Correct Behavior for Production
+
+You should HARD FAIL if updateV1 fails.
+
+Because upgrade flow is atomic:
+
+Payment ✔
+Image ✔
+Metadata ✔
+On-chain update ❗ MUST succeed
+
+If last step fails → rollback / refund / retry.
+
+🔧 Recommended Fix
+
+Replace:
+
+try {
+  return updateV1Instruction;
+} catch (e) {
+  return memoInstruction; // ❌ dangerous
+}
+
+With:
+
+try {
+  return updateV1Instruction;
+} catch (e) {
+  console.error("Core updateV1 failed:", e);
+  throw new Error("METADATA_UPDATE_FAILED");
+}
+
+Then surface to UI:
+
+"Upgrade failed on-chain. Payment safe. Please retry."
+⚠️ 2 More Things to Double-Check (Subtle Bugs)
+1️⃣ Ensure URI uses ipfs://CID
+
+If you pass:
+
+https://gateway.pinata.cloud/ipfs/Qm...
+
+Some indexers treat this as mutable URL.
+
+Always:
+
+ipfs://Qm...
+2️⃣ Ensure Delegate Has Update Authority
+
+Core NFT update requires:
+
+updateAuthority OR delegated authority
+
+So confirm:
+
+delegate PDA or keypair == update authority
+
+Otherwise updateV1 will fail randomly.
+
+🏁 Final Verdict
+Is your architecture correct?
+
+✔ YES — fully correct Core NFT upgrade pipeline
+
+Is updateV1 being used properly?
+
+✔ YES — equivalent to updateAsset()
+
+Is memo fallback safe?
+
+❌ NO — must be removed (silent corruption risk)
+
+🔥 Recommendation
+
+Yes — remove the memo fallback immediately
+and make metadata update a hard failure.
+
+That protects:
+
+User trust
+
+Trait store integrity
+
+Payment → upgrade atomic guarantee

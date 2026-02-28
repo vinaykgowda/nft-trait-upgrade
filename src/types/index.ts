@@ -173,3 +173,55 @@ export interface NFTMetadata {
     }>;
   };
 }
+
+
+// User Profile (Discord-based)
+export interface UserProfile {
+  id: string;
+  discordId: string;
+  discordUsername: string;
+  discordDisplayName?: string;
+  discordAvatar?: string;
+  discordServers?: DiscordServer[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DiscordServer {
+  id: string;
+  name: string;
+  icon?: string;
+}
+
+export interface UserLinkedWallet {
+  id: string;
+  userId: string;
+  walletAddress: string;
+  label?: string;
+  verified: boolean;
+  createdAt: string;
+}
+
+// Trait Vouchers
+export type VoucherStatus = 'active' | 'redeemed' | 'revoked';
+
+export interface TraitVoucher {
+  id: string;
+  code: string;
+  userId: string;
+  traitId: string;
+  slotId: string;
+  rarityTierId: string;
+  status: VoucherStatus;
+  redeemedAt?: string;
+  redeemedPurchaseId?: string;
+  createdBy?: string;
+  createdAt: string;
+  updatedAt: string;
+  // Joined fields
+  discordUsername?: string;
+  traitName?: string;
+  slotName?: string;
+  rarityName?: string;
+}
+

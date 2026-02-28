@@ -9,6 +9,9 @@ export { InventoryReservationRepository } from './inventory';
 export { AdminUserRepository } from './admin-users';
 export { AuditLogRepository } from './audit-logs';
 export { GiftBalanceRepository } from './gift-balances';
+export { UserProfileRepository } from './user-profiles';
+export { UserLinkedWalletRepository } from './user-linked-wallets';
+export { TraitVoucherRepository } from './trait-vouchers';
 
 import { ProjectRepository } from './projects';
 import { TraitRepository } from './traits';
@@ -18,6 +21,9 @@ import { InventoryReservationRepository } from './inventory';
 import { AdminUserRepository } from './admin-users';
 import { AuditLogRepository } from './audit-logs';
 import { GiftBalanceRepository } from './gift-balances';
+import { UserProfileRepository } from './user-profiles';
+import { UserLinkedWalletRepository } from './user-linked-wallets';
+import { TraitVoucherRepository } from './trait-vouchers';
 
 // Repository instances (singletons)
 let projectRepo: ProjectRepository;
@@ -28,6 +34,9 @@ let inventoryRepo: InventoryReservationRepository;
 let adminUserRepo: AdminUserRepository;
 let auditLogRepo: AuditLogRepository;
 let giftBalanceRepo: GiftBalanceRepository;
+let userProfileRepo: UserProfileRepository;
+let userLinkedWalletRepo: UserLinkedWalletRepository;
+let traitVoucherRepo: TraitVoucherRepository;
 
 export function getProjectRepository(): ProjectRepository {
   if (!projectRepo) {
@@ -83,4 +92,25 @@ export function getGiftBalanceRepository(): GiftBalanceRepository {
     giftBalanceRepo = new GiftBalanceRepository();
   }
   return giftBalanceRepo;
+}
+
+export function getUserProfileRepository(): UserProfileRepository {
+  if (!userProfileRepo) {
+    userProfileRepo = new UserProfileRepository();
+  }
+  return userProfileRepo;
+}
+
+export function getUserLinkedWalletRepository(): UserLinkedWalletRepository {
+  if (!userLinkedWalletRepo) {
+    userLinkedWalletRepo = new UserLinkedWalletRepository();
+  }
+  return userLinkedWalletRepo;
+}
+
+export function getTraitVoucherRepository(): TraitVoucherRepository {
+  if (!traitVoucherRepo) {
+    traitVoucherRepo = new TraitVoucherRepository();
+  }
+  return traitVoucherRepo;
 }

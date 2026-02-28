@@ -20,6 +20,10 @@ interface TraitSwapNotification {
   oldImageUrl?: string;
   newTraits: TraitChange[];
   txSignature?: string;
+  /** Discord user ID for tagging */
+  discordId?: string;
+  /** Discord username as fallback display */
+  discordUsername?: string;
 }
 
 export async function sendTraitSwapToDiscord(notification: TraitSwapNotification): Promise<void> {
@@ -37,10 +41,17 @@ export async function sendTraitSwapToDiscord(notification: TraitSwapNotification
 
     const magicEdenUrl = `https://magiceden.io/item-details/${notification.nftAddress}`;
 
+    // Show Discord mention if available, otherwise wallet address
+    const userDisplay = notification.discordId
+      ? `<@${notification.discordId}>`
+      : notification.discordUsername
+        ? `@${notification.discordUsername}`
+        : `\`${shortWallet}\``;
+
     // Main embed with info + new image as the large image
     const mainEmbed: any = {
       title: '🎨 Trait Swap Alert!',
-      description: `**[${notification.nftName}](${magicEdenUrl})** just got a fresh look!\n\n👛 Wallet: \`${shortWallet}\``,
+      description: `**[${notification.nftName}](${magicEdenUrl})** just got a fresh look!\n\n👛 ${userDisplay}`,
       color: 0x00d4aa,
       fields: [
         {

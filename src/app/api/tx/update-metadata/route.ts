@@ -8,6 +8,8 @@ import { getProjectRepository } from '@/lib/repositories';
 import { CoreAssetUpdateService } from '@/lib/services/core-asset-update';
 import { PinataUploadService } from '@/lib/services/pinata-upload';
 import { sendTraitSwapToDiscord } from '@/lib/services/discord-webhook';
+import { UserLinkedWalletRepository } from '@/lib/repositories/user-linked-wallets';
+import { UserProfileRepository } from '@/lib/repositories/user-profiles';
 
 const metadataUpdateSchema = z.object({
   walletAddress: z.string().min(32).max(44),
@@ -173,6 +175,24 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ Core asset URI updated on-chain:', updateResult.signature);
 
+    // Look up Discord profile for the wallet (non-blocking lookup)
+    let discordId: string | undefined;
+    let discordUsername: string | undefined;
+    try {
+      const walletRepo = new UserLinkedWalletRepository();
+      const linked = await walletRepo.findByWalletAddress(body.walletAddress);
+      if (linked) {
+        const profileRepo = new UserProfileRepository();
+        const profile = await profileRepo.findById(linked.user_id);
+        if (profile) {
+          discordId = profile.discord_id;
+          discordUsername = profile.discord_username;
+        }
+      }
+    } catch (err) {
+      console.log('Profile lookup for webhook failed (non-blocking):', err);
+    }
+
     // Send Discord notification (fire-and-forget, never blocks the response)
     sendTraitSwapToDiscord({
       walletAddress: body.walletAddress,
@@ -181,6 +201,8 @@ export async function POST(request: NextRequest) {
       imageUrl: body.newImageUrl,
       oldImageUrl: heliusMeta?.image || undefined,
       newTraits: body.newAttributes as { trait_type: string; value: string }[],
+      discordId,
+      discordUsername,
     }).catch(() => {}); // swallow any errors
 
     return apiResponse.success({

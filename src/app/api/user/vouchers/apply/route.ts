@@ -3,6 +3,8 @@ import { UserSessionService } from '@/lib/auth/user-session';
 import { TraitVoucherRepository } from '@/lib/repositories/trait-vouchers';
 import { z } from 'zod';
 
+export const dynamic = 'force-dynamic';
+
 const applyVoucherSchema = z.object({
   code: z.string().length(12),
   traitId: z.string().uuid(),

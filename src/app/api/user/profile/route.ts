@@ -3,6 +3,8 @@ import { UserSessionService } from '@/lib/auth/user-session';
 import { UserProfileRepository } from '@/lib/repositories/user-profiles';
 import { UserLinkedWalletRepository } from '@/lib/repositories/user-linked-wallets';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   const session = await UserSessionService.getSessionFromCookies();
   if (!session) {

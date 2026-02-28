@@ -1,8 +1,9 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 
-export default function ProfileLoginPage() {
+function LoginContent() {
   const searchParams = useSearchParams();
   const error = searchParams.get('error');
 
@@ -33,5 +34,17 @@ export default function ProfileLoginPage() {
         </a>
       </div>
     </div>
+  );
+}
+
+export default function ProfileLoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#0f1117] flex items-center justify-center">
+        <div className="text-white/50">Loading...</div>
+      </div>
+    }>
+      <LoginContent />
+    </Suspense>
   );
 }

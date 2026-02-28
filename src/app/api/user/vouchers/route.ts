@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { UserSessionService } from '@/lib/auth/user-session';
 import { TraitVoucherRepository } from '@/lib/repositories/trait-vouchers';
 
+export const dynamic = 'force-dynamic';
+
 // Get user's vouchers
 export async function GET(request: NextRequest) {
   const session = await UserSessionService.getSessionFromCookies();

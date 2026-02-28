@@ -4,6 +4,8 @@ import { TraitVoucherRepository } from '@/lib/repositories/trait-vouchers';
 import { AuditLogRepository } from '@/lib/repositories/audit-logs';
 import { z } from 'zod';
 
+export const dynamic = 'force-dynamic';
+
 const redeemSchema = z.object({
   voucherId: z.string().uuid(),
   purchaseId: z.string().uuid(),

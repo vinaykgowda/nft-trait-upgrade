@@ -5,6 +5,8 @@ import { UserProfileRepository } from '@/lib/repositories/user-profiles';
 import { AuditLogRepository } from '@/lib/repositories/audit-logs';
 import { z } from 'zod';
 
+export const dynamic = 'force-dynamic';
+
 const createVoucherSchema = z.object({
   userId: z.string().uuid(),
   traitId: z.string().uuid(),

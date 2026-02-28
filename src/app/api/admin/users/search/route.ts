@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { SessionService } from '@/lib/auth/session';
 import { UserProfileRepository } from '@/lib/repositories/user-profiles';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   const session = await SessionService.getSessionFromCookies();
   if (!session) {

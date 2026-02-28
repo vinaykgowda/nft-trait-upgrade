@@ -4,6 +4,8 @@ import { UserLinkedWalletRepository } from '@/lib/repositories/user-linked-walle
 import { ProjectRepository } from '@/lib/repositories/projects';
 import { createNFTService } from '@/lib/services/nft';
 
+export const dynamic = 'force-dynamic';
+
 // Fetch NFTs from all linked wallets matching project collections
 export async function GET(request: NextRequest) {
   const session = await UserSessionService.getSessionFromCookies();

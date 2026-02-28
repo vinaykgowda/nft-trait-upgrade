@@ -3,6 +3,8 @@ import { UserSessionService } from '@/lib/auth/user-session';
 import { UserLinkedWalletRepository } from '@/lib/repositories/user-linked-wallets';
 import { z } from 'zod';
 
+export const dynamic = 'force-dynamic';
+
 const linkWalletSchema = z.object({
   walletAddress: z.string().min(32).max(44),
   label: z.string().max(100).optional(),

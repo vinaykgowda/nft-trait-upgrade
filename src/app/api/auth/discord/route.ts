@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+
 // Discord OAuth2 - redirect to Discord authorization
 export async function GET(request: NextRequest) {
   const clientId = process.env.DISCORD_CLIENT_ID;

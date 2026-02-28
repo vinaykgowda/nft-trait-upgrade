@@ -4,6 +4,8 @@ import { TraitVoucherRepository } from '@/lib/repositories/trait-vouchers';
 import { AuditLogRepository } from '@/lib/repositories/audit-logs';
 import { z } from 'zod';
 
+export const dynamic = 'force-dynamic';
+
 const updateVoucherSchema = z.object({
   userId: z.string().uuid().optional(),
   traitId: z.string().uuid().optional(),

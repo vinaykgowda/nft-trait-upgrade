@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
       discordDisplayName: userData.global_name || userData.username,
       discordAvatar: userData.avatar
         ? `https://cdn.discordapp.com/avatars/${userData.id}/${userData.avatar}.png`
-        : null,
+        : undefined,
       discordServers: servers,
     });
 

@@ -187,15 +187,15 @@ export function EnhancedPurchaseFlow({ selectedNFT, selectedTraits, onSuccess, o
 
       updateState({ step: 'metadata_updated', progress: 85 });
 
-      // Redeem the voucher (mark as used)
-      try {
-        await fetch('/api/user/vouchers/redeem', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ voucherId: voucherValid.id, purchaseId: voucherValid.id }),
-        });
-      } catch (err) {
-        console.error('Voucher redeem call failed (non-blocking):', err);
+      // Redeem the voucher (mark as used) — must succeed
+      const redeemRes = await fetch('/api/user/vouchers/redeem-by-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ voucherId: voucherValid.id, walletAddress: publicKey.toString() }),
+      });
+      if (!redeemRes.ok) {
+        const redeemErr = await redeemRes.json().catch(() => ({}));
+        console.error('Voucher redeem failed:', redeemRes.status, redeemErr);
       }
 
       if (onSuccess) onSuccess('voucher-' + voucherValid.id, newImageUrl);

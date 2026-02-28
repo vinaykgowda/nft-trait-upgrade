@@ -74,10 +74,14 @@ export async function GET(request: NextRequest) {
       discordAvatar: profile.discord_avatar,
     });
 
-    const response = NextResponse.redirect(new URL('/profile', request.url));
+    const response = NextResponse.redirect(new URL(
+      request.cookies.get('discord-oauth-return')?.value || '/profile',
+      request.url
+    ));
     UserSessionService.setSessionCookie(token);
-    // Clear OAuth state cookie
+    // Clear OAuth cookies
     response.cookies.set('discord-oauth-state', '', { maxAge: 0, path: '/' });
+    response.cookies.set('discord-oauth-return', '', { maxAge: 0, path: '/' });
     return response;
   } catch (error) {
     console.error('Discord OAuth callback error:', error);

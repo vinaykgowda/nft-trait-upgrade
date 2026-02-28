@@ -32,5 +32,17 @@ export async function GET(request: NextRequest) {
     path: '/',
   });
 
+  // Store return URL if provided
+  const returnUrl = request.nextUrl.searchParams.get('returnUrl');
+  if (returnUrl) {
+    response.cookies.set('discord-oauth-return', returnUrl, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 300,
+      path: '/',
+    });
+  }
+
   return response;
 }

@@ -72,10 +72,13 @@ export default function VouchersPage() {
     const slotsData = await slotsRes.json();
     const raritiesData = await raritiesRes.json();
     const traitsData = await traitsRes.json();
-    setSlots(slotsData.slots || slotsData || []);
+    // /api/trait-slots returns { success: true, data: [...] }
+    setSlots(slotsData.data || slotsData.slots || slotsData || []);
+    // /api/admin/rarities returns { rarities: [...] }
     setRarities(raritiesData.rarities || raritiesData || []);
+    // /api/admin/traits returns { traits: [...] } with camelCase fields
     setTraits((traitsData.traits || []).map((t: any) => ({
-      id: t.id, name: t.name, slot_id: t.slot_id, rarity_tier_id: t.rarity_tier_id,
+      id: t.id, name: t.name, slot_id: t.slotId || t.slot_id, rarity_tier_id: t.rarityTier?.id || t.rarity_tier_id,
     })));
   };
 

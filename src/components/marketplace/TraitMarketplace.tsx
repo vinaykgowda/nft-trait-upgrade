@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { CoreAsset, Trait, TraitSlot } from '@/types';
@@ -14,6 +14,21 @@ interface TraitChange {
   slotName: string;
   oldTrait: string;
   newTrait: Trait;
+}
+
+interface UserProfile {
+  id: string;
+  discordId: string;
+  discordUsername: string;
+  discordDisplayName?: string;
+  discordAvatar?: string;
+  discordServers?: { id: string; name: string; icon?: string }[];
+}
+
+interface LinkedWallet {
+  id: string;
+  walletAddress: string;
+  label?: string;
 }
 
 function getRarityClass(name: string): string {
@@ -37,7 +52,7 @@ function getRarityBadgeColor(name: string): string {
 }
 
 export function TraitMarketplace() {
-  const { connected } = useWallet();
+  const { connected, publicKey } = useWallet();
   const [selectedNFT, setSelectedNFT] = useState<CoreAsset | null>(null);
   const [traits, setTraits] = useState<Trait[]>([]);
   const [slots, setSlots] = useState<TraitSlot[]>([]);
@@ -53,8 +68,62 @@ export function TraitMarketplace() {
     updatedImageUrl: string;
   } | null>(null);
 
+  // Profile state
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [linkedWallets, setLinkedWallets] = useState<LinkedWallet[]>([]);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+
   const tabsRef = useRef<HTMLDivElement>(null);
   const traitsRowRef = useRef<HTMLDivElement>(null);
+
+  // Close profile menu on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target as Node)) {
+        setShowProfileMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Auto-fetch profile when wallet connects
+  const fetchProfileByWallet = useCallback(async (walletAddress: string) => {
+    setProfileLoading(true);
+    try {
+      const res = await fetch(`/api/user/profile-by-wallet?wallet=${walletAddress}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.profile) {
+          setUserProfile(data.profile);
+          setLinkedWallets(data.wallets || []);
+        } else {
+          setUserProfile(null);
+          setLinkedWallets([]);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch profile:', err);
+    } finally {
+      setProfileLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (connected && publicKey) {
+      fetchProfileByWallet(publicKey.toString());
+    } else {
+      setUserProfile(null);
+      setLinkedWallets([]);
+    }
+  }, [connected, publicKey, fetchProfileByWallet]);
+
+  const handleDiscordConnect = () => {
+    const returnUrl = window.location.href;
+    window.location.href = `/api/auth/discord?returnUrl=${encodeURIComponent(returnUrl)}`;
+  };
 
   useEffect(() => { fetchData(); }, []);
   useEffect(() => { if (slots.length > 0 && !activeSlotId) setActiveSlotId(slots[0].id); }, [slots, activeSlotId]);
@@ -177,10 +246,114 @@ export function TraitMarketplace() {
           </div>
         )}
 
-        {/* TOP BAR: Logo left, Wallet right */}
+        {/* TOP BAR: Logo left, Profile + Wallet right */}
         <div className="flex items-center justify-between px-3 sm:px-4 py-2">
           <img src="/logo.webp" alt="Pepeverse Trait Forge" className="h-14 sm:h-16 object-contain drop-shadow-2xl" />
-          <WalletMultiButton />
+          <div className="flex items-center gap-2">
+            {/* Profile section - shows after wallet connects */}
+            {connected && (
+              <div className="relative" ref={profileMenuRef}>
+                <button
+                  onClick={() => setShowProfileMenu(!showProfileMenu)}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg transition"
+                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
+                >
+                  {profileLoading ? (
+                    <div className="w-7 h-7 rounded-full bg-white/10 animate-pulse" />
+                  ) : userProfile?.discordAvatar ? (
+                    <img src={userProfile.discordAvatar} alt="" className="w-7 h-7 rounded-full" />
+                  ) : (
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold"
+                      style={{ background: userProfile ? 'rgba(139,92,246,0.5)' : 'rgba(255,255,255,0.1)', color: '#fff' }}>
+                      {userProfile ? userProfile.discordUsername[0].toUpperCase() : '?'}
+                    </div>
+                  )}
+                  <span className="text-sm text-white/70 hidden sm:inline">
+                    {userProfile ? userProfile.discordDisplayName || userProfile.discordUsername : 'Profile'}
+                  </span>
+                  <svg className="w-3.5 h-3.5 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {/* Profile Dropdown */}
+                {showProfileMenu && (
+                  <div className="absolute right-0 top-full mt-2 w-72 rounded-xl overflow-hidden shadow-2xl z-50"
+                    style={{ background: '#1a1d27', border: '1px solid rgba(255,255,255,0.1)' }}>
+                    {userProfile ? (
+                      <>
+                        {/* Profile header */}
+                        <div className="p-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                          <div className="flex items-center gap-3">
+                            {userProfile.discordAvatar ? (
+                              <img src={userProfile.discordAvatar} alt="" className="w-10 h-10 rounded-full" />
+                            ) : (
+                              <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold"
+                                style={{ background: 'rgba(139,92,246,0.5)', color: '#fff' }}>
+                                {userProfile.discordUsername[0].toUpperCase()}
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <p className="text-white text-sm font-medium truncate">
+                                {userProfile.discordDisplayName || userProfile.discordUsername}
+                              </p>
+                              <p className="text-white/40 text-xs truncate">@{userProfile.discordUsername}</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Linked wallets */}
+                        {linkedWallets.length > 0 && (
+                          <div className="px-4 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                            <p className="text-white/40 text-[10px] uppercase tracking-wider mb-2">Linked Wallets</p>
+                            {linkedWallets.map(w => (
+                              <div key={w.id} className="flex items-center gap-2 py-1">
+                                <div className="w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0" />
+                                <span className="text-white/60 text-xs font-mono truncate">
+                                  {w.walletAddress.slice(0, 4)}...{w.walletAddress.slice(-4)}
+                                </span>
+                                {w.label && <span className="text-white/30 text-xs">({w.label})</span>}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Menu items */}
+                        <div className="py-1">
+                          <a href="/profile" className="flex items-center gap-3 px-4 py-2.5 text-sm text-white/70 hover:bg-white/[0.04] transition">
+                            <svg className="w-4 h-4 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
+                            My Profile
+                          </a>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        {/* No profile - prompt to connect Discord */}
+                        <div className="p-4 text-center">
+                          <div className="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center"
+                            style={{ background: 'rgba(88,101,242,0.15)' }}>
+                            <svg className="w-6 h-6" viewBox="0 0 24 24" fill="#5865F2">
+                              <path d="M20.317 4.37a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.736 19.736 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 00-.041-.106 13.107 13.107 0 01-1.872-.892.077.077 0 01-.008-.128 10.2 10.2 0 00.372-.292.074.074 0 01.077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.01c.12.098.246.198.373.292a.077.077 0 01-.006.127 12.299 12.299 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.839 19.839 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03z" />
+                            </svg>
+                          </div>
+                          <p className="text-white text-sm font-medium mb-1">Connect Discord</p>
+                          <p className="text-white/40 text-xs mb-4">Link your Discord to create a profile, track NFTs across wallets, and use vouchers</p>
+                          <button onClick={handleDiscordConnect}
+                            className="w-full py-2.5 rounded-lg text-sm font-medium transition"
+                            style={{ background: '#5865F2', color: '#fff' }}>
+                            Connect with Discord
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+            <WalletMultiButton />
+          </div>
         </div>
 
         {/* MAIN 2-COLUMN LAYOUT */}

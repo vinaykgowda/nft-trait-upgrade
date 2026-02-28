@@ -8,7 +8,13 @@ function LoginContent() {
   const error = searchParams.get('error');
 
   return (
-    <div className="min-h-screen bg-[#0f1117] flex items-center justify-center">
+    <div className="min-h-screen bg-[#0f1117] flex flex-col">
+      <div className="px-6 py-4 border-b border-white/[0.06]">
+        <a href="/marketplace" className="text-white/60 hover:text-white text-sm transition flex items-center gap-1">
+          ← Back to Trait Forge
+        </a>
+      </div>
+      <div className="flex-1 flex items-center justify-center">
       <div className="max-w-sm w-full space-y-6 text-center">
         <h1 className="text-3xl font-bold text-white">Connect with Discord</h1>
         <p className="text-white/50 text-sm">
@@ -32,6 +38,7 @@ function LoginContent() {
           </svg>
           Sign in with Discord
         </a>
+      </div>
       </div>
     </div>
   );

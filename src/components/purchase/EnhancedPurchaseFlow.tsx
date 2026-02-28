@@ -92,17 +92,17 @@ export function EnhancedPurchaseFlow({ selectedNFT, selectedTraits, onSuccess, o
       const res = await fetch('/api/user/vouchers/apply', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: voucherCode.toUpperCase(), traitId: trait.id }),
+        body: JSON.stringify({ code: voucherCode.toUpperCase(), traitId: trait.id, walletAddress: publicKey?.toString() }),
       });
       if (res.ok) {
         const data = await res.json();
         setVoucherValid({ id: data.voucher.id, traitName: data.voucher.traitName, slotName: data.voucher.slotName });
       } else {
         const errData = await res.json();
-        setVoucherError(errData.error || 'Voucher does not match the selected trait');
+        setVoucherError(errData.error || 'Invalid Code');
       }
     } catch {
-      setVoucherError('Failed to validate voucher');
+      setVoucherError('Invalid Code');
     } finally {
       setVoucherChecking(false);
     }

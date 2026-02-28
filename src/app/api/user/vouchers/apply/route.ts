@@ -10,11 +10,11 @@ const applyVoucherSchema = z.object({
   traitId: z.string().uuid(),
 });
 
-// Validate and apply a voucher code during checkout
+// Validate and apply a voucher code during checkout — requires Discord session
 export async function POST(request: NextRequest) {
   const session = await UserSessionService.getSessionFromCookies();
   if (!session) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    return NextResponse.json({ error: 'You need to login with Discord to proceed' }, { status: 401 });
   }
 
   try {
@@ -25,19 +25,17 @@ export async function POST(request: NextRequest) {
     const voucher = await voucherRepo.findByCode(code.toUpperCase());
 
     if (!voucher) {
-      return NextResponse.json({ error: 'Invalid voucher code' }, { status: 404 });
+      return NextResponse.json({ error: 'Invalid Code' }, { status: 404 });
     }
 
     if (voucher.status !== 'active') {
       return NextResponse.json({ error: `Voucher has already been ${voucher.status}` }, { status: 400 });
     }
 
-    // Voucher must belong to this user
     if (voucher.user_id !== session.userId) {
       return NextResponse.json({ error: 'This voucher is not assigned to your account' }, { status: 403 });
     }
 
-    // Voucher trait must match the trait being purchased
     if (voucher.trait_id !== traitId) {
       return NextResponse.json({
         error: 'This voucher is for a different trait',
@@ -58,7 +56,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: any) {
     if (error.name === 'ZodError') {
-      return NextResponse.json({ error: 'Invalid input', details: error.errors }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid Code' }, { status: 400 });
     }
     console.error('Apply voucher error:', error);
     return NextResponse.json({ error: 'Failed to validate voucher' }, { status: 500 });

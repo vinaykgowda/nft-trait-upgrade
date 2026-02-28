@@ -70,6 +70,7 @@ export function TraitMarketplace() {
 
   // Profile state
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [hasDiscordSession, setHasDiscordSession] = useState(false);
   const [linkedWallets, setLinkedWallets] = useState<LinkedWallet[]>([]);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [profileLoading, setProfileLoading] = useState(false);
@@ -99,6 +100,7 @@ export function TraitMarketplace() {
         const sessionData = await sessionRes.json();
         if (sessionData.profile) {
           setUserProfile(sessionData.profile);
+          setHasDiscordSession(true);
           setLinkedWallets(sessionData.wallets || []);
           setProfileLoading(false);
           return;
@@ -112,6 +114,7 @@ export function TraitMarketplace() {
           const data = await res.json();
           if (data.profile) {
             setUserProfile(data.profile);
+            setHasDiscordSession(false);
             setLinkedWallets(data.wallets || []);
             return;
           }
@@ -119,6 +122,7 @@ export function TraitMarketplace() {
       }
 
       setUserProfile(null);
+      setHasDiscordSession(false);
       setLinkedWallets([]);
     } catch (err) {
       console.error('Failed to fetch profile:', err);
@@ -273,7 +277,7 @@ export function TraitMarketplace() {
             {/* Profile section - shows after wallet connects */}
             {connected && (
               <div className="relative" ref={profileMenuRef}>
-                {userProfile ? (
+                {userProfile && hasDiscordSession ? (
                   <button
                     onClick={() => setShowProfileMenu(!showProfileMenu)}
                     className="flex items-center gap-2 px-3 py-2 rounded-lg transition"
@@ -310,7 +314,7 @@ export function TraitMarketplace() {
                 )}
 
                 {/* Profile Dropdown - only when logged in */}
-                {showProfileMenu && userProfile && (
+                {showProfileMenu && userProfile && hasDiscordSession && (
                   <div className="absolute right-0 top-full mt-2 w-72 rounded-xl overflow-hidden shadow-2xl z-50"
                     style={{ background: '#1a1d27', border: '1px solid rgba(255,255,255,0.1)' }}>
                       <>
@@ -333,22 +337,6 @@ export function TraitMarketplace() {
                             </div>
                           </div>
                         </div>
-
-                        {/* Linked wallets */}
-                        {linkedWallets.length > 0 && (
-                          <div className="px-4 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                            <p className="text-white/40 text-[10px] uppercase tracking-wider mb-2">Linked Wallets</p>
-                            {linkedWallets.map(w => (
-                              <div key={w.id} className="flex items-center gap-2 py-1">
-                                <div className="w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0" />
-                                <span className="text-white/60 text-xs font-mono truncate">
-                                  {w.walletAddress.slice(0, 4)}...{w.walletAddress.slice(-4)}
-                                </span>
-                                {w.label && <span className="text-white/30 text-xs">({w.label})</span>}
-                              </div>
-                            ))}
-                          </div>
-                        )}
 
                         {/* Menu items */}
                         <div className="py-1">

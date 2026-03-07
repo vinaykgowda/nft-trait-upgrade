@@ -65,6 +65,7 @@ export default function TraitsManagerPage() {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [sortBy, setSortBy] = useState('name');
   const [showOnSaleOnly, setShowOnSaleOnly] = useState(false);
+  const [showEarnerOnly, setShowEarnerOnly] = useState(false);
   const [showAddTrait, setShowAddTrait] = useState(false);
   const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [bulkFiles, setBulkFiles] = useState<File[]>([]);
@@ -1060,7 +1061,8 @@ export default function TraitsManagerPage() {
   const filteredTraits = traits.filter(trait => {
     const categoryMatch = selectedCategory === 'All' || trait.slotName === selectedCategory;
     const saleMatch = !showOnSaleOnly || trait.active;
-    return categoryMatch && saleMatch;
+    const earnerMatch = !showEarnerOnly || (trait.earnerToken && trait.earnerAmount);
+    return categoryMatch && saleMatch && earnerMatch;
   });
 
   const sortedTraits = [...filteredTraits].sort((a, b) => {
@@ -1162,6 +1164,16 @@ export default function TraitsManagerPage() {
                   />
                   <span className="text-sm">On Sale Only</span>
                 </label>
+
+                <label className="flex items-center space-x-2 text-emerald-400">
+                  <input
+                    type="checkbox"
+                    checked={showEarnerOnly}
+                    onChange={(e) => setShowEarnerOnly(e.target.checked)}
+                    className="rounded border-gray-600 bg-gray-800 text-emerald-500 focus:ring-emerald-500"
+                  />
+                  <span className="text-sm">Earner Traits Only</span>
+                </label>
               </div>
 
               <div className="flex space-x-3">
@@ -1180,49 +1192,6 @@ export default function TraitsManagerPage() {
             {/* Bulk Actions */}
             <div className="flex flex-wrap gap-2">
               <button 
-                onClick={async () => {
-                  try {
-                    const response = await fetch('/api/admin/debug-rarity');
-                    const data = await response.json();
-                    alert('Check browser console for database debug info');
-                  } catch (error) {
-                    alert('Failed to fetch debug info');
-                  }
-                }}
-                className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-500"
-              >
-                🔍 Debug DB
-              </button>
-              <button 
-                onClick={async () => {
-                  if (confirm('🔧 Repair Upload\n\nThis will create traits from existing images in the uploads folder.\nContinue?')) {
-                    setLoading(true);
-                    try {
-                      const response = await fetch('/api/admin/repair-upload', {
-                        method: 'POST',
-                        credentials: 'include'
-                      });
-                      const result = await response.json();
-                      if (response.ok) {
-                        alert(`✅ ${result.message}`);
-                        fetchTraits(); // Refresh traits list
-                      } else {
-                        alert(`❌ ${result.error}`);
-                      }
-                    } catch (error) {
-                      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-                      alert(`❌ Failed to repair upload: ${errorMessage}`);
-                    } finally {
-                      setLoading(false);
-                    }
-                  }
-                }}
-                disabled={loading}
-                className="bg-green-700 text-green-300 px-3 py-1 rounded text-sm hover:bg-green-600 transition-colors disabled:opacity-50"
-              >
-                {loading ? '🔧 Repairing...' : '🔧 Repair Upload'}
-              </button>
-              <button 
                 onClick={handleDeleteAllTraits}
                 disabled={loading || traits.length === 0}
                 className="bg-red-700 text-red-300 px-3 py-1 rounded text-sm hover:bg-red-600 transition-colors disabled:opacity-50"
@@ -1236,12 +1205,14 @@ export default function TraitsManagerPage() {
               <div>
                 Showing {sortedTraits.length} of {traits.length} traits
                 {showOnSaleOnly && <span className="text-green-400 ml-2">(On Sale Only)</span>}
+                {showEarnerOnly && <span className="text-emerald-400 ml-2">(Earner Only)</span>}
                 {selectedCategory !== 'All' && <span className="text-blue-400 ml-2">({selectedCategory})</span>}
               </div>
-              {(showOnSaleOnly || selectedCategory !== 'All') && (
+              {(showOnSaleOnly || showEarnerOnly || selectedCategory !== 'All') && (
                 <button
                   onClick={() => {
                     setShowOnSaleOnly(false);
+                    setShowEarnerOnly(false);
                     setSelectedCategory('All');
                   }}
                   className="text-red-400 hover:text-red-300 text-xs"
@@ -1275,12 +1246,15 @@ export default function TraitsManagerPage() {
                           ? `No traits on sale in "${selectedCategory}" category.`
                           : showOnSaleOnly 
                           ? 'No traits are currently on sale.'
+                          : showEarnerOnly
+                          ? 'No traits have earner tokens configured.'
                           : `No traits found in "${selectedCategory}" category.`
                         }
                       </p>
                       <button
                         onClick={() => {
                           setShowOnSaleOnly(false);
+                          setShowEarnerOnly(false);
                           setSelectedCategory('All');
                         }}
                         className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-500 transition-colors"

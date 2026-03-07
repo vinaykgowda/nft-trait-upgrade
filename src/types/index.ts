@@ -25,6 +25,8 @@ export interface Trait {
   remainingSupply?: number;
   priceAmount: string; // Changed from bigint to string
   priceToken: Token;
+  earnerToken?: Token;
+  earnerAmount?: string;
   active: boolean;
 }
 

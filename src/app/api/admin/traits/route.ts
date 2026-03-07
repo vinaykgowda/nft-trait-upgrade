@@ -69,6 +69,13 @@ export async function GET(request: NextRequest) {
         decimals: trait.token_decimals || 9,
         mintAddress: trait.token_mint_address,
       },
+      earnerToken: trait.earner_token_id ? {
+        id: trait.earner_token_id,
+        symbol: trait.earner_token_symbol || 'UNKNOWN',
+        decimals: trait.earner_token_decimals || 9,
+        mintAddress: trait.earner_token_mint_address,
+      } : null,
+      earnerAmount: trait.earner_amount ? formatDecimalPrice(trait.earner_amount) : null,
       active: trait.active,
       createdAt: trait.created_at,
       updatedAt: trait.updated_at,
@@ -113,6 +120,8 @@ export async function POST(request: NextRequest) {
     const artistWallet = formData.get('artistWallet') as string;
     const artistCommission = formData.get('artistCommission') as string;
     const imageFile = formData.get('image') as File;
+    const earnerTokenId = formData.get('earnerTokenId') as string | null;
+    const earnerAmount = formData.get('earnerAmount') as string | null;
 
     // Basic validation
     if (!name || !traitValue || !priceAmount || !priceTokenId || !totalSupply || !rarityTierId) {
@@ -239,7 +248,7 @@ export async function POST(request: NextRequest) {
     const auditRepo = getAuditLogRepository();
 
     // Create trait data
-    const traitData = {
+    const traitData: any = {
       slotId,
       name: traitValue,
       imageLayerUrl: imageUrl,
@@ -250,6 +259,12 @@ export async function POST(request: NextRequest) {
       priceTokenId: finalTokenId,
       active,
     };
+
+    // Add earner fields if provided
+    if (earnerTokenId && earnerAmount) {
+      traitData.earnerTokenId = earnerTokenId;
+      traitData.earnerAmount = earnerAmount;
+    }
 
     // Convert to database format
     const dbData = {

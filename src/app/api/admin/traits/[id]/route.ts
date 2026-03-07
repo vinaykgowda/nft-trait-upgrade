@@ -49,6 +49,13 @@ export async function GET(
         decimals: trait.token_decimals,
         mintAddress: trait.token_mint_address,
       },
+      earnerToken: trait.earner_token_id ? {
+        id: trait.earner_token_id,
+        symbol: trait.earner_token_symbol || 'UNKNOWN',
+        decimals: trait.earner_token_decimals || 9,
+        mintAddress: trait.earner_token_mint_address,
+      } : null,
+      earnerAmount: trait.earner_amount ? formatDecimalPrice(trait.earner_amount) : null,
       active: trait.active,
       createdAt: trait.created_at,
       updatedAt: trait.updated_at,
@@ -101,6 +108,8 @@ export async function PUT(
     const totalSupply = formData.get('totalSupply') as string;
     const active = formData.get('active') === 'true';
     const imageFile = formData.get('image') as File | null;
+    const earnerTokenId = formData.get('earnerTokenId') as string | null;
+    const earnerAmount = formData.get('earnerAmount') as string | null;
 
     let imageUrl = existingTrait.image_layer_url; // Keep existing image by default
 
@@ -197,7 +206,7 @@ export async function PUT(
     }
 
     // Update trait data
-    const updateData = {
+    const updateData: any = {
       slot_id: slotId,
       name: traitValue || name,
       image_layer_url: imageUrl,
@@ -208,6 +217,15 @@ export async function PUT(
       price_token_id: finalTokenId, // Use converted token ID
       active,
     };
+
+    // Handle earner fields — allow clearing them by passing empty string
+    if (earnerTokenId && earnerAmount) {
+      updateData.earner_token_id = earnerTokenId;
+      updateData.earner_amount = earnerAmount;
+    } else {
+      updateData.earner_token_id = null;
+      updateData.earner_amount = null;
+    }
 
     const updatedTrait = await traitRepo.update(params.id, updateData);
 

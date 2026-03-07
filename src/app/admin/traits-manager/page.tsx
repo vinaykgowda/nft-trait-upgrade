@@ -29,6 +29,13 @@ interface Trait {
     decimals: number;
     mintAddress?: string;
   };
+  earnerToken?: {
+    id: string;
+    symbol: string;
+    decimals: number;
+    mintAddress?: string;
+  } | null;
+  earnerAmount?: string | null;
   active: boolean;
   createdAt: string;
   updatedAt: string;
@@ -85,6 +92,8 @@ export default function TraitsManagerPage() {
     forSale: true,
     imageFile: null as File | null,
     imagePreview: '',
+    earnerToken: '',
+    earnerAmount: '',
   });
 
   // Bulk upload form
@@ -103,6 +112,13 @@ export default function TraitsManagerPage() {
   // Edit trait state
   const [editingTrait, setEditingTrait] = useState<Trait | null>(null);
   const [showEditTrait, setShowEditTrait] = useState(false);
+
+  // Earner token custom address state
+  const [earnerTokenMode, setEarnerTokenMode] = useState<'select' | 'custom'>('select');
+  const [customEarnerAddress, setCustomEarnerAddress] = useState('');
+  const [customEarnerLoading, setCustomEarnerLoading] = useState(false);
+  const [customEarnerInfo, setCustomEarnerInfo] = useState<{ symbol: string; name: string; decimals: number } | null>(null);
+  const [customEarnerError, setCustomEarnerError] = useState('');
 
   useEffect(() => {
     fetchAvailableTokens();
@@ -347,6 +363,12 @@ export default function TraitsManagerPage() {
         formData.append('artistCommission', traitForm.artistCommission);
       }
 
+      // Add earner token fields if provided
+      if (traitForm.earnerToken && traitForm.earnerAmount) {
+        formData.append('earnerTokenId', traitForm.earnerToken);
+        formData.append('earnerAmount', traitForm.earnerAmount);
+      }
+
       const response = await fetch('/api/admin/traits', {
         method: 'POST',
         credentials: 'include',
@@ -373,6 +395,8 @@ export default function TraitsManagerPage() {
         forSale: true,
         imageFile: null,
         imagePreview: '',
+        earnerToken: '',
+        earnerAmount: '',
       });
       setShowAddTrait(false);
       
@@ -402,7 +426,14 @@ export default function TraitsManagerPage() {
       forSale: trait.active,
       imageFile: null,
       imagePreview: trait.imageLayerUrl,
+      earnerToken: trait.earnerToken?.id || '',
+      earnerAmount: trait.earnerAmount || '',
     });
+    // Reset earner token mode based on whether the trait has an earner token
+    setEarnerTokenMode('select');
+    setCustomEarnerAddress('');
+    setCustomEarnerInfo(null);
+    setCustomEarnerError('');
     setShowEditTrait(true);
   };
 
@@ -445,6 +476,12 @@ export default function TraitsManagerPage() {
       formData.append('totalSupply', traitForm.totalQuantity);
       formData.append('active', traitForm.forSale.toString());
 
+      // Add earner token fields
+      if (traitForm.earnerToken && traitForm.earnerAmount) {
+        formData.append('earnerTokenId', traitForm.earnerToken);
+        formData.append('earnerAmount', traitForm.earnerAmount);
+      }
+
       const response = await fetch(`/api/admin/traits/${editingTrait.id}`, {
         method: 'PUT',
         credentials: 'include',
@@ -473,6 +510,8 @@ export default function TraitsManagerPage() {
         forSale: true,
         imageFile: null,
         imagePreview: '',
+        earnerToken: '',
+        earnerAmount: '',
       });
       
       // Refresh traits list
@@ -1777,6 +1816,141 @@ export default function TraitsManagerPage() {
                       Is item currently for sale?
                     </label>
                   </div>
+
+                  {/* Earner Token (Optional) */}
+                  <div className="border border-gray-700 rounded-lg p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-sm font-medium text-green-400">
+                        Earner Token (Optional)
+                      </label>
+                      {traitForm.earnerToken && (
+                        <button
+                          type="button"
+                          onClick={() => setTraitForm({ ...traitForm, earnerToken: '', earnerAmount: '' })}
+                          className="text-xs text-red-400 hover:text-red-300"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setEarnerTokenMode('select')}
+                        className={`px-3 py-1 rounded text-xs font-medium ${earnerTokenMode === 'select' ? 'bg-green-600 text-black' : 'bg-gray-700 text-gray-400'}`}
+                      >
+                        Select Token
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEarnerTokenMode('custom')}
+                        className={`px-3 py-1 rounded text-xs font-medium ${earnerTokenMode === 'custom' ? 'bg-green-600 text-black' : 'bg-gray-700 text-gray-400'}`}
+                      >
+                        Custom Address
+                      </button>
+                    </div>
+                    {earnerTokenMode === 'select' ? (
+                      <select
+                        value={traitForm.earnerToken}
+                        onChange={(e) => setTraitForm({ ...traitForm, earnerToken: e.target.value })}
+                        className="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-green-400 text-sm"
+                      >
+                        <option value="">None (no earner)</option>
+                        {availableTokens.map(token => (
+                          <option key={token.id} value={token.id}>
+                            {token.tokenSymbol} - {token.tokenName}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={customEarnerAddress}
+                            onChange={(e) => { setCustomEarnerAddress(e.target.value); setCustomEarnerError(''); setCustomEarnerInfo(null); }}
+                            placeholder="Token mint address..."
+                            className="flex-1 bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-green-400 text-sm"
+                          />
+                          <button
+                            type="button"
+                            disabled={!customEarnerAddress || customEarnerLoading}
+                            onClick={async () => {
+                              setCustomEarnerLoading(true);
+                              setCustomEarnerError('');
+                              try {
+                                const res = await fetch('/api/admin/tokens/info', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  credentials: 'include',
+                                  body: JSON.stringify({ tokenAddress: customEarnerAddress }),
+                                });
+                                if (!res.ok) throw new Error('Token not found');
+                                const data = await res.json();
+                                setCustomEarnerInfo(data.tokenInfo);
+                                // Add to project tokens if not already there
+                                const existing = availableTokens.find(t => t.tokenAddress === customEarnerAddress);
+                                if (existing) {
+                                  setTraitForm(prev => ({ ...prev, earnerToken: existing.id }));
+                                } else {
+                                  // Add to project tokens via API
+                                  const projectRes = await fetch('/api/admin/projects', { credentials: 'include' });
+                                  const projectData = await projectRes.json();
+                                  const projectId = projectData.projects?.[0]?.id;
+                                  if (projectId) {
+                                    const addRes = await fetch(`/api/admin/projects/${projectId}/tokens`, {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      credentials: 'include',
+                                      body: JSON.stringify({
+                                        tokenAddress: customEarnerAddress,
+                                        tokenName: data.tokenInfo.name,
+                                        tokenSymbol: data.tokenInfo.symbol,
+                                        decimals: data.tokenInfo.decimals,
+                                      }),
+                                    });
+                                    if (addRes.ok) {
+                                      const addData = await addRes.json();
+                                      await fetchAvailableTokens();
+                                      setTraitForm(prev => ({ ...prev, earnerToken: addData.token?.id || '' }));
+                                    }
+                                  }
+                                }
+                              } catch {
+                                setCustomEarnerError('Token not found or invalid address');
+                              } finally {
+                                setCustomEarnerLoading(false);
+                              }
+                            }}
+                            className="px-3 py-2 bg-green-600 text-black rounded-md text-sm font-medium hover:bg-green-500 disabled:opacity-50"
+                          >
+                            {customEarnerLoading ? '...' : 'Lookup'}
+                          </button>
+                        </div>
+                        {customEarnerInfo && (
+                          <p className="text-xs text-green-400">Found: {customEarnerInfo.symbol} ({customEarnerInfo.name})</p>
+                        )}
+                        {customEarnerError && (
+                          <p className="text-xs text-red-400">{customEarnerError}</p>
+                        )}
+                      </div>
+                    )}
+                    {traitForm.earnerToken && (
+                      <div>
+                        <label className="block text-sm font-medium text-green-400 mb-1">
+                          Earner Amount
+                        </label>
+                        <input
+                          type="number"
+                          step="any"
+                          value={traitForm.earnerAmount}
+                          onChange={(e) => setTraitForm({ ...traitForm, earnerAmount: e.target.value })}
+                          placeholder="e.g., 3"
+                          className="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-green-400 text-sm"
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex justify-end space-x-3 pt-6 border-t border-gray-700 mt-6">
@@ -1944,6 +2118,139 @@ export default function TraitsManagerPage() {
                     <label htmlFor="editForSale" className="ml-2 block text-sm text-blue-400">
                       Is item currently for sale?
                     </label>
+                  </div>
+
+                  {/* Earner Token (Optional) */}
+                  <div className="border border-gray-700 rounded-lg p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-sm font-medium text-blue-400">
+                        Earner Token (Optional)
+                      </label>
+                      {traitForm.earnerToken && (
+                        <button
+                          type="button"
+                          onClick={() => setTraitForm({ ...traitForm, earnerToken: '', earnerAmount: '' })}
+                          className="text-xs text-red-400 hover:text-red-300"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setEarnerTokenMode('select')}
+                        className={`px-3 py-1 rounded text-xs font-medium ${earnerTokenMode === 'select' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-400'}`}
+                      >
+                        Select Token
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEarnerTokenMode('custom')}
+                        className={`px-3 py-1 rounded text-xs font-medium ${earnerTokenMode === 'custom' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-400'}`}
+                      >
+                        Custom Address
+                      </button>
+                    </div>
+                    {earnerTokenMode === 'select' ? (
+                      <select
+                        value={traitForm.earnerToken}
+                        onChange={(e) => setTraitForm({ ...traitForm, earnerToken: e.target.value })}
+                        className="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-blue-400 text-sm"
+                      >
+                        <option value="">None (no earner)</option>
+                        {availableTokens.map(token => (
+                          <option key={token.id} value={token.id}>
+                            {token.tokenSymbol} - {token.tokenName}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={customEarnerAddress}
+                            onChange={(e) => { setCustomEarnerAddress(e.target.value); setCustomEarnerError(''); setCustomEarnerInfo(null); }}
+                            placeholder="Token mint address..."
+                            className="flex-1 bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-blue-400 text-sm"
+                          />
+                          <button
+                            type="button"
+                            disabled={!customEarnerAddress || customEarnerLoading}
+                            onClick={async () => {
+                              setCustomEarnerLoading(true);
+                              setCustomEarnerError('');
+                              try {
+                                const res = await fetch('/api/admin/tokens/info', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  credentials: 'include',
+                                  body: JSON.stringify({ tokenAddress: customEarnerAddress }),
+                                });
+                                if (!res.ok) throw new Error('Token not found');
+                                const data = await res.json();
+                                setCustomEarnerInfo(data.tokenInfo);
+                                const existing = availableTokens.find(t => t.tokenAddress === customEarnerAddress);
+                                if (existing) {
+                                  setTraitForm(prev => ({ ...prev, earnerToken: existing.id }));
+                                } else {
+                                  const projectRes = await fetch('/api/admin/projects', { credentials: 'include' });
+                                  const projectData = await projectRes.json();
+                                  const projectId = projectData.projects?.[0]?.id;
+                                  if (projectId) {
+                                    const addRes = await fetch(`/api/admin/projects/${projectId}/tokens`, {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      credentials: 'include',
+                                      body: JSON.stringify({
+                                        tokenAddress: customEarnerAddress,
+                                        tokenName: data.tokenInfo.name,
+                                        tokenSymbol: data.tokenInfo.symbol,
+                                        decimals: data.tokenInfo.decimals,
+                                      }),
+                                    });
+                                    if (addRes.ok) {
+                                      const addData = await addRes.json();
+                                      await fetchAvailableTokens();
+                                      setTraitForm(prev => ({ ...prev, earnerToken: addData.token?.id || '' }));
+                                    }
+                                  }
+                                }
+                              } catch {
+                                setCustomEarnerError('Token not found or invalid address');
+                              } finally {
+                                setCustomEarnerLoading(false);
+                              }
+                            }}
+                            className="px-3 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-500 disabled:opacity-50"
+                          >
+                            {customEarnerLoading ? '...' : 'Lookup'}
+                          </button>
+                        </div>
+                        {customEarnerInfo && (
+                          <p className="text-xs text-blue-400">Found: {customEarnerInfo.symbol} ({customEarnerInfo.name})</p>
+                        )}
+                        {customEarnerError && (
+                          <p className="text-xs text-red-400">{customEarnerError}</p>
+                        )}
+                      </div>
+                    )}
+                    {traitForm.earnerToken && (
+                      <div>
+                        <label className="block text-sm font-medium text-blue-400 mb-1">
+                          Earner Amount
+                        </label>
+                        <input
+                          type="number"
+                          step="any"
+                          value={traitForm.earnerAmount}
+                          onChange={(e) => setTraitForm({ ...traitForm, earnerAmount: e.target.value })}
+                          placeholder="e.g., 3"
+                          className="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-blue-400 text-sm"
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
 

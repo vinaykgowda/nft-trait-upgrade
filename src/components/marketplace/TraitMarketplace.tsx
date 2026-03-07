@@ -446,8 +446,16 @@ export function TraitMarketplace() {
                                 <span className={`absolute top-1.5 left-1.5 text-[10px] font-semibold px-1.5 py-0.5 rounded border ${badgeColor}`}>
                                   {trait.rarityTier.name}
                                 </span>
-                                {isSelected && (
+                                {trait.earnerToken && trait.earnerAmount && (
+                                  <span className="absolute top-1.5 right-1.5 text-[10px] font-semibold px-1.5 py-0.5 rounded border bg-emerald-500/20 text-emerald-300 border-emerald-500/40">
+                                    {trait.earnerAmount} ${trait.earnerToken.symbol}
+                                  </span>
+                                )}
+                                {isSelected && !trait.earnerToken && (
                                   <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full flex items-center justify-center text-[10px]" style={{ background: 'rgba(201,168,76,0.9)', color: '#0a0a0f' }}>✓</div>
+                                )}
+                                {isSelected && trait.earnerToken && (
+                                  <div className="absolute bottom-1.5 right-1.5 w-5 h-5 rounded-full flex items-center justify-center text-[10px]" style={{ background: 'rgba(201,168,76,0.9)', color: '#0a0a0f' }}>✓</div>
                                 )}
                                 {!isAvailable && (
                                   <div className="absolute inset-0 bg-black/60 flex items-center justify-center">

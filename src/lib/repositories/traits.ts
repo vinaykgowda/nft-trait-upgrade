@@ -14,6 +14,8 @@ export interface TraitRow {
   remaining_supply?: number;
   price_amount: string; // decimal stored as string
   price_token_id: string;
+  earner_token_id?: string;
+  earner_amount?: string;
   active: boolean;
   created_at: Date;
   updated_at: Date;
@@ -27,6 +29,9 @@ export interface TraitWithRelations extends TraitRow {
   token_symbol: string | null;
   token_decimals: number | null;
   token_mint_address?: string | null;
+  earner_token_symbol?: string | null;
+  earner_token_decimals?: number | null;
+  earner_token_mint_address?: string | null;
 }
 
 export class TraitRepository extends BaseRepository<TraitRow> {
@@ -97,12 +102,17 @@ export class TraitRepository extends BaseRepository<TraitRow> {
         rt.weight as rarity_weight,
         COALESCE(tok.symbol, pt.token_symbol) as token_symbol,
         COALESCE(tok.decimals, pt.decimals) as token_decimals,
-        COALESCE(tok.mint_address, pt.token_address) as token_mint_address
+        COALESCE(tok.mint_address, pt.token_address) as token_mint_address,
+        COALESCE(etok.symbol, ept.token_symbol) as earner_token_symbol,
+        COALESCE(etok.decimals, ept.decimals) as earner_token_decimals,
+        COALESCE(etok.mint_address, ept.token_address) as earner_token_mint_address
       FROM ${this.tableName} t
       LEFT JOIN trait_slots ts ON t.slot_id = ts.id
       LEFT JOIN rarity_tiers rt ON t.rarity_tier_id = rt.id
       LEFT JOIN tokens tok ON t.price_token_id = tok.id
       LEFT JOIN project_tokens pt ON t.price_token_id = pt.id
+      LEFT JOIN tokens etok ON t.earner_token_id = etok.id
+      LEFT JOIN project_tokens ept ON t.earner_token_id = ept.id
       ${whereClause}
       ORDER BY COALESCE(ts.layer_order, 999), COALESCE(rt.display_order, 999), t.name
       ${limitClause}
@@ -247,7 +257,7 @@ export class TraitRepository extends BaseRepository<TraitRow> {
 
   // Convert database row to domain model
   toDomain(row: TraitWithRelations): Trait {
-    return {
+    const result: Trait = {
       id: row.id,
       slotId: row.slot_id,
       name: row.name,
@@ -270,6 +280,20 @@ export class TraitRepository extends BaseRepository<TraitRow> {
       },
       active: row.active,
     };
+
+    // Add earner token info if present
+    if (row.earner_token_id && row.earner_amount) {
+      result.earnerToken = {
+        id: row.earner_token_id,
+        symbol: row.earner_token_symbol || 'UNKNOWN',
+        mintAddress: row.earner_token_mint_address || undefined,
+        decimals: row.earner_token_decimals || 9,
+        enabled: true,
+      };
+      result.earnerAmount = formatDecimalPrice(row.earner_amount);
+    }
+
+    return result;
   }
 
   // Convert domain model to database row
@@ -285,6 +309,18 @@ export class TraitRepository extends BaseRepository<TraitRow> {
       price_token_id: trait.priceToken?.id || (trait as any).priceTokenId, // Handle both nested and flat structure
       active: trait.active,
     };
+
+    // Handle earner token fields
+    if ((trait as any).earnerTokenId !== undefined) {
+      result.earner_token_id = (trait as any).earnerTokenId || undefined;
+    } else if (trait.earnerToken?.id) {
+      result.earner_token_id = trait.earnerToken.id;
+    }
+    if ((trait as any).earnerAmount !== undefined) {
+      result.earner_amount = (trait as any).earnerAmount || undefined;
+    } else if (trait.earnerAmount) {
+      result.earner_amount = trait.earnerAmount;
+    }
 
     // Only include id if it's defined (for create operations)
     if (trait.id !== undefined) {

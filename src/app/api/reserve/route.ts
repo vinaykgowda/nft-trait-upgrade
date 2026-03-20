@@ -57,9 +57,12 @@ export async function POST(request: NextRequest) {
         };
       }
 
-      // Check inventory availability for all traits
+      // Check inventory availability for all traits WITH ROW LOCKS to prevent race conditions
       for (const trait of validTraits) {
         if (trait.total_supply !== null) {
+          // Lock the trait row to prevent concurrent reservations
+          await inventoryRepo.lockTraitForReservation(trait.id, client);
+          
           const activeReservationCount = await inventoryRepo.getActiveReservationCount(trait.id, client);
           const availableSupply = Math.max(0, (trait.remaining_supply || 0) - activeReservationCount);
           
@@ -69,7 +72,7 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Create reservations for all traits
+      // Create reservations for all traits (now safe from race conditions)
       const reservations = await Promise.all(
         traitIds.map(traitId =>
           inventoryRepo.createReservation(traitId, walletAddress, assetId, client)

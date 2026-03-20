@@ -102,7 +102,11 @@ CREATE TABLE inventory_reservations (
     asset_id VARCHAR(44) NOT NULL,
     expires_at TIMESTAMP NOT NULL,
     status VARCHAR(20) DEFAULT 'reserved',
-    created_at TIMESTAMP DEFAULT NOW()
+    created_at TIMESTAMP DEFAULT NOW(),
+    -- Prevent duplicate active reservations for SAME wallet+asset+trait combination
+    -- This allows multiple people to buy the same trait, but prevents one person
+    -- from creating duplicate reservations for the same NFT+trait
+    CONSTRAINT unique_active_reservation UNIQUE (wallet_address, asset_id, trait_id, status)
 );
 
 CREATE TABLE purchases (
@@ -115,6 +119,7 @@ CREATE TABLE purchases (
     treasury_wallet VARCHAR(44) NOT NULL,
     status VARCHAR(20) DEFAULT 'created',
     tx_signature VARCHAR(88) UNIQUE,
+    reservation_id UUID REFERENCES inventory_reservations(id),
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
 );

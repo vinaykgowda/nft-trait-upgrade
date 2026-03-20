@@ -16,6 +16,7 @@
     "deploy:rollback": "./scripts/rollback.sh",
     "db:migrate": "psql $DATABASE_URL -f database/migrations/001_initial_schema.sql",
     "db:migrate:local": "psql $DATABASE_URL -f database/migrations/001_initial_schema.sql",
+    "db:migrate:security": "node scripts/migrate-neon.js",
     "db:reset": "psql $DATABASE_URL -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;' && npm run db:migrate:local",
     "db:seed": "node scripts/seed-local-data.js",
     "dev:setup": "npm install && npm run db:migrate:local && npm run db:seed"

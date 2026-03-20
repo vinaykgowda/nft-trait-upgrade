@@ -30,6 +30,8 @@ export class InventoryReservationRepository extends BaseRepository<InventoryRese
     const queryText = `
       INSERT INTO ${this.tableName} (trait_id, wallet_address, asset_id, expires_at, status)
       VALUES ($1, $2, $3, $4, 'reserved')
+      ON CONFLICT (wallet_address, asset_id, trait_id, status) 
+      DO UPDATE SET expires_at = EXCLUDED.expires_at
       RETURNING *
     `;
     const queryFn = client ? client.query.bind(client) : query;
@@ -119,6 +121,16 @@ export class InventoryReservationRepository extends BaseRepository<InventoryRese
     
     const result = await queryFn(queryText, [traitId]);
     return parseInt(result.rows[0].count);
+  }
+
+  /**
+   * Lock trait row for update to prevent race conditions during reservation
+   */
+  async lockTraitForReservation(traitId: string, client: PoolClient): Promise<void> {
+    await client.query(
+      `SELECT id FROM traits WHERE id = $1 FOR UPDATE`,
+      [traitId]
+    );
   }
 
   async cleanupExpiredReservations(client?: PoolClient): Promise<number> {

@@ -13,6 +13,7 @@ export interface PurchaseRow {
   treasury_wallet: string;
   status: PurchaseStatus;
   tx_signature?: string;
+  reservation_id?: string;
   created_at: Date;
   updated_at: Date;
 }
@@ -169,6 +170,7 @@ export class PurchaseRepository extends BaseRepository<PurchaseRow> {
       treasuryWallet: row.treasury_wallet,
       status: row.status,
       txSignature: row.tx_signature,
+      reservationId: row.reservation_id,
     };
   }
 
@@ -183,6 +185,7 @@ export class PurchaseRepository extends BaseRepository<PurchaseRow> {
       treasury_wallet: purchase.treasuryWallet,
       status: purchase.status,
       tx_signature: purchase.txSignature,
+      reservation_id: purchase.reservationId,
     };
 
     if (purchase.id !== undefined) {

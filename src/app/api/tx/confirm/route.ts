@@ -9,32 +9,44 @@ import { Transaction } from '@solana/web3.js';
 import { query } from '@/lib/database';
 
 const confirmTransactionSchema = z.object({
-  reservationId: z.string().uuid(),
+  reservationId: z.string().uuid().optional(), // Single reservation (legacy)
+  reservationIds: z.array(z.string().uuid()).optional(), // Multiple reservations (new)
   signedTransaction: z.string(),
 });
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { reservationId, signedTransaction } = confirmTransactionSchema.parse(body);
+    const { reservationId, reservationIds, signedTransaction } = confirmTransactionSchema.parse(body);
 
-    console.log('🔄 Confirming transaction for reservation:', reservationId);
+    // Support both single and multiple reservations
+    const reservationIdsToProcess = reservationIds || (reservationId ? [reservationId] : []);
+    if (reservationIdsToProcess.length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'No reservation IDs provided' },
+        { status: 400 }
+      );
+    }
+
+    console.log('🔄 Confirming transaction for reservations:', reservationIdsToProcess);
 
     const transactionBuilder = new TransactionBuilder();
     const inventoryManager = new InventoryManager();
     const purchaseRepo = new PurchaseRepository();
     const transactionMonitor = new TransactionMonitor();
 
-    // Verify reservation is still valid
-    const reservationStatus = await inventoryManager.getReservationStatus(reservationId);
-    if (!reservationStatus.found || reservationStatus.isExpired) {
-      return NextResponse.json(
-        { success: false, error: 'Reservation expired or not found' },
-        { status: 400 }
-      );
+    // Verify all reservations are still valid
+    const reservations = [];
+    for (const resId of reservationIdsToProcess) {
+      const reservationStatus = await inventoryManager.getReservationStatus(resId);
+      if (!reservationStatus.found || reservationStatus.isExpired) {
+        return NextResponse.json(
+          { success: false, error: `Reservation ${resId} expired or not found` },
+          { status: 400 }
+        );
+      }
+      reservations.push(reservationStatus.reservation!);
     }
-
-    const reservation = reservationStatus.reservation!;
 
     // Deserialize the signed transaction
     let transaction: Transaction;
@@ -62,72 +74,104 @@ export async function POST(request: NextRequest) {
       hasUpdate: validation.hasUpdateInstruction
     });
 
-    // Get trait data for price and token info
+    // Get trait data for all reservations
     const traitRepo = new (await import('@/lib/repositories/traits')).TraitRepository();
     const traitsWithRelations = await traitRepo.findWithRelations({});
-    const trait = traitsWithRelations.find(t => t.id === reservation.traitId);
-
-    if (!trait) {
-      return NextResponse.json(
-        { success: false, error: 'Trait not found' },
-        { status: 400 }
-      );
-    }
+    const traits = reservations.map(res => {
+      const trait = traitsWithRelations.find(t => t.id === res.traitId);
+      if (!trait) throw new Error(`Trait ${res.traitId} not found`);
+      return trait;
+    });
 
     const treasuryWallet = await configService.getTreasuryWallet();
 
-    // Consume reservation and create purchase record
-    // This decrements supply inside a transaction
-    const purchaseData = {
-      walletAddress: reservation.walletAddress,
-      assetId: reservation.assetId,
-      traitId: reservation.traitId,
-      priceAmount: trait.price_amount,
-      tokenId: trait.price_token_id,
+    // Calculate total price for all traits (for purchase record)
+    const totalPriceAmount = traits.reduce((sum, t) => sum + parseFloat(t.price_amount), 0).toString();
+    const primaryTokenId = traits[0].price_token_id;
+
+    // Consume ALL reservations and create purchase records atomically
+    // This decrements supply for each trait inside a transaction
+    const purchaseDataTemplate = {
+      priceAmount: totalPriceAmount,
+      tokenId: primaryTokenId,
       treasuryWallet: treasuryWallet,
       status: 'tx_built' as const,
     };
 
-    const consumeResult = await inventoryManager.consumeReservation(reservationId, purchaseData);
+    const consumeResult = await inventoryManager.consumeMultipleReservations(
+      reservationIdsToProcess,
+      purchaseDataTemplate
+    );
+    
     if (!consumeResult.success) {
       return NextResponse.json(
-        { success: false, error: consumeResult.error || 'Failed to consume reservation' },
+        { success: false, error: consumeResult.error || 'Failed to consume reservations' },
         { status: 400 }
       );
     }
 
-    const purchase = consumeResult.purchase!;
+    const purchases = consumeResult.purchases!;
+    const primaryPurchase = purchases[0];
 
     try {
       console.log('📡 Sending atomic transaction to Solana...');
 
       const result = await transactionBuilder.sendAndConfirmTransaction({
         transaction,
-        requiredSignatures: [reservation.walletAddress],
+        requiredSignatures: [reservations[0].walletAddress],
         delegateSignatures: [],
       });
 
       if (result.success) {
         console.log('✅ Atomic transaction confirmed:', result.signature);
 
-        await purchaseRepo.updateStatus(purchase.id, 'confirmed', result.signature);
-        await transactionMonitor.startMonitoring(result.signature!, purchase.id);
+        // Update all purchase records with confirmed status
+        for (const purchase of purchases) {
+          await purchaseRepo.updateStatus(purchase.id, 'confirmed', result.signature);
+        }
+        
+        await transactionMonitor.startMonitoring(result.signature!, primaryPurchase.id);
 
         return NextResponse.json({
           success: true,
           signature: result.signature,
-          purchaseId: purchase.id,
+          purchaseId: primaryPurchase.id,
+          purchaseIds: purchases.map(p => p.id),
           status: 'confirmed',
           message: 'Transaction completed successfully',
           paymentExecuted: result.paymentExecuted,
           updateExecuted: result.updateExecuted,
+          traitsProcessed: purchases.length,
         });
       } else {
         console.error('❌ Transaction failed:', result.error);
 
-        // Transaction failed — restore supply and mark purchase as failed
-        await purchaseRepo.updateStatus(purchase.id, 'failed');
-        await restoreSupply(reservation.traitId);
+        // SECURITY FIX: If we have a signature, DO NOT restore supply immediately
+        // The transaction might still confirm. Mark as pending and let monitoring handle it.
+        if (result.signature) {
+          console.warn('⚠️ Transaction timeout with signature - marking as pending:', result.signature);
+          
+          for (const purchase of purchases) {
+            await purchaseRepo.updateStatus(purchase.id, 'pending', result.signature);
+          }
+          
+          // Start monitoring to check if it confirms later
+          await transactionMonitor.startMonitoring(result.signature, primaryPurchase.id);
+          
+          return NextResponse.json({
+            success: false,
+            signature: result.signature,
+            status: 'pending',
+            error: 'Transaction confirmation timeout - monitoring for completion',
+            message: 'Your transaction was submitted but confirmation is taking longer than expected. We are monitoring it.',
+          }, { status: 202 }); // 202 Accepted
+        }
+
+        // No signature means transaction never made it to the network - safe to restore
+        for (const purchase of purchases) {
+          await purchaseRepo.updateStatus(purchase.id, 'failed');
+          await restoreSupply(purchase.traitId);
+        }
 
         return NextResponse.json(
           { success: false, error: result.error || 'Transaction failed' },
@@ -137,9 +181,11 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       console.error('❌ Transaction confirmation error:', error);
 
-      // Exception during send — restore supply and mark purchase as failed
-      await purchaseRepo.updateStatus(purchase.id, 'failed');
-      await restoreSupply(reservation.traitId);
+      // Exception during send — restore supply for all traits and mark purchases as failed
+      for (const purchase of purchases) {
+        await purchaseRepo.updateStatus(purchase.id, 'failed');
+        await restoreSupply(purchase.traitId);
+      }
 
       return NextResponse.json(
         { success: false, error: 'Transaction confirmation failed' },

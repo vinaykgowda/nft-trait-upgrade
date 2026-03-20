@@ -16,7 +16,8 @@ const paymentItemSchema = z.object({
 const transactionBuildSchema = z.object({
   walletAddress: z.string().min(32).max(44),
   assetId: z.string().min(32).max(44),
-  reservationId: z.string().uuid(),
+  reservationId: z.string().uuid().optional(), // Single reservation (legacy)
+  reservationIds: z.array(z.string().uuid()).optional(), // Multiple reservations (new)
   // Legacy single-token fields (backwards compatible)
   paymentToken: z.enum(['SOL', 'LDZ']).optional(),
   totalAmount: z.number().positive().optional(),
@@ -35,7 +36,7 @@ export async function POST(request: NextRequest) {
     console.log('📥 Transaction build request:', body);
 
     const {
-      walletAddress, assetId, reservationId,
+      walletAddress, assetId, reservationId, reservationIds,
       paymentToken, totalAmount, payments, transactionType
     } = validateRequestBody(body, transactionBuildSchema);
 
@@ -52,17 +53,28 @@ export async function POST(request: NextRequest) {
       console.log('⚠️ Skipping NFT ownership verification in development mode');
     }
 
-    // Verify reservation
-    const reservationStatus = await inventoryManager.getReservationStatus(reservationId);
-    if (!reservationStatus.found || reservationStatus.isExpired) {
-      return apiResponse.error('Reservation not found or expired', 400);
-    }
-    const reservation = reservationStatus.reservation!;
-    if (reservation.walletAddress !== walletAddress || reservation.assetId !== assetId) {
-      return apiResponse.error('Reservation does not match request parameters', 400);
+    // Support both single and multiple reservations
+    const reservationIdsToProcess = reservationIds || (reservationId ? [reservationId] : []);
+    if (reservationIdsToProcess.length === 0) {
+      return apiResponse.error('No reservation IDs provided', 400);
     }
 
-    const traitIds = [reservation.traitId];
+    // Verify all reservations
+    const reservations = [];
+    for (const resId of reservationIdsToProcess) {
+      const reservationStatus = await inventoryManager.getReservationStatus(resId);
+      if (!reservationStatus.found || reservationStatus.isExpired) {
+        return apiResponse.error(`Reservation ${resId} not found or expired`, 400);
+      }
+      const reservation = reservationStatus.reservation!;
+      if (reservation.walletAddress !== walletAddress || reservation.assetId !== assetId) {
+        return apiResponse.error(`Reservation ${resId} does not match request parameters`, 400);
+      }
+      reservations.push(reservation);
+    }
+
+    // Get all trait IDs from reservations
+    const traitIds = reservations.map(r => r.traitId);
     const traitsWithRelations = await traitRepo.findWithRelations({});
     const traits = traitsWithRelations.filter(trait => traitIds.includes(trait.id));
     if (traits.length !== traitIds.length) {
@@ -72,47 +84,49 @@ export async function POST(request: NextRequest) {
     const treasuryWallet = await configService.getTreasuryWallet();
     console.log('💰 Using treasury wallet:', treasuryWallet);
 
-    // Build the list of payment instructions to include in ONE transaction
-    // Supports both legacy (single paymentToken/totalAmount) and new (payments array) formats
+    // SECURITY FIX: ALWAYS derive payment amounts from database trait prices
+    // NEVER trust client-supplied payment amounts
     const paymentList: Array<{ amount: string; tokenMintAddress?: string; tokenSymbol: string }> = [];
-
-    if (payments && payments.length > 0) {
-      // New format: explicit payments array (supports mixed tokens in one tx)
-      for (const p of payments) {
-        let tokenMintAddress: string | undefined;
-        if (p.token !== 'SOL') {
-          tokenMintAddress = await configService.getTokenMintAddress(p.token as 'SOL' | 'LDZ');
-          if (!tokenMintAddress) {
-            return apiResponse.error(`${p.token} token mint not configured`, 500);
-          }
-        }
-        paymentList.push({ amount: p.amount.toString(), tokenMintAddress, tokenSymbol: p.token });
-      }
-    } else if (paymentToken && totalAmount) {
-      // Legacy format: single token
-      let tokenMintAddress: string | undefined;
-      if (paymentToken === 'LDZ') {
-        tokenMintAddress = await configService.getTokenMintAddress('LDZ');
-        if (!tokenMintAddress) return apiResponse.error('LDZ token mint not configured', 500);
-      }
-      paymentList.push({ amount: totalAmount.toString(), tokenMintAddress, tokenSymbol: paymentToken });
-    } else {
-      // Auto-determine from trait data
-      let solTotal = 0, ldzTotal = 0;
-      for (const trait of traits) {
-        const amount = parseFloat(trait.price_amount);
-        if (trait.token_symbol === 'SOL') solTotal += amount;
-        else if (trait.token_symbol === 'LDZ') ldzTotal += amount;
-      }
-      if (solTotal > 0) paymentList.push({ amount: solTotal.toString(), tokenMintAddress: undefined, tokenSymbol: 'SOL' });
-      if (ldzTotal > 0) {
-        const ldzMint = await configService.getTokenMintAddress('LDZ');
-        if (!ldzMint) return apiResponse.error('LDZ token mint not configured', 500);
-        paymentList.push({ amount: ldzTotal.toString(), tokenMintAddress: ldzMint, tokenSymbol: 'LDZ' });
+    
+    // Calculate actual amounts from database trait prices
+    let solTotal = 0, ldzTotal = 0;
+    for (const trait of traits) {
+      const amount = parseFloat(trait.price_amount);
+      if (trait.token_symbol === 'SOL') {
+        solTotal += amount;
+      } else if (trait.token_symbol === 'LDZ') {
+        ldzTotal += amount;
       }
     }
 
-    console.log('💰 Payment instructions to build:', paymentList);
+    // Build payment list from calculated amounts
+    if (solTotal > 0) {
+      paymentList.push({ 
+        amount: solTotal.toString(), 
+        tokenMintAddress: undefined, 
+        tokenSymbol: 'SOL' 
+      });
+    }
+    if (ldzTotal > 0) {
+      const ldzMint = await configService.getTokenMintAddress('LDZ');
+      if (!ldzMint) return apiResponse.error('LDZ token mint not configured', 500);
+      paymentList.push({ 
+        amount: ldzTotal.toString(), 
+        tokenMintAddress: ldzMint, 
+        tokenSymbol: 'LDZ' 
+      });
+    }
+
+    console.log('💰 Payment instructions (derived from DB):', paymentList);
+    
+    // Validate client-supplied amounts match database (if provided)
+    if (payments && payments.length > 0) {
+      const clientTotal = payments.reduce((sum, p) => sum + p.amount, 0);
+      const dbTotal = solTotal + ldzTotal;
+      if (Math.abs(clientTotal - dbTotal) > 0.000001) {
+        console.warn('⚠️ Client payment amount mismatch - using database amounts');
+      }
+    }
 
     // Token account checks for SPL tokens
     for (const p of paymentList) {
@@ -164,7 +178,8 @@ export async function POST(request: NextRequest) {
 
     return apiResponse.success({
       transaction: serializedTransaction,
-      reservationId,
+      reservationId: reservationIdsToProcess[0], // Legacy compatibility
+      reservationIds: reservationIdsToProcess,
       transactionType: 'payment',
       paymentDetails: {
         payments: paymentList.map(p => ({ token: p.tokenSymbol, amount: parseFloat(p.amount) })),
@@ -172,7 +187,10 @@ export async function POST(request: NextRequest) {
         hasMixedPayment: paymentList.length > 1
       },
       traits: traits.map(trait => ({ id: trait.id, name: trait.name, priceAmount: trait.price_amount, priceToken: trait.price_token_id })),
-      timeRemaining: reservationStatus.timeRemaining,
+      timeRemaining: Math.min(...reservations.map(r => {
+        const status = inventoryManager.getReservationStatus(r.id);
+        return status.then(s => s.timeRemaining || 0);
+      })),
       validation: { hasPaymentInstruction: validation.hasPaymentInstruction, hasUpdateInstruction: validation.hasUpdateInstruction }
     });
   } catch (error) {

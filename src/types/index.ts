@@ -62,9 +62,10 @@ export interface Purchase {
   treasuryWallet: string; // Added missing field
   status: PurchaseStatus;
   txSignature?: string;
+  reservationId?: string; // Link to reservation
 }
 
-export type PurchaseStatus = 'created' | 'tx_built' | 'confirmed' | 'failed' | 'fulfilled';
+export type PurchaseStatus = 'created' | 'tx_built' | 'confirmed' | 'failed' | 'fulfilled' | 'pending';
 
 export interface ReservationRequest {
   walletAddress: string;

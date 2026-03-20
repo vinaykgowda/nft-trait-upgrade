@@ -243,9 +243,12 @@ export function EnhancedPurchaseFlow({ selectedNFT, selectedTraits, onSuccess, o
       }
 
       const reservationResult = await reservationResponse.json();
-      const reservationId = reservationResult.data?.reservations?.[0]?.id || reservationResult.reservationId;
-      if (!reservationId) throw new Error('No reservation ID returned from server');
-      updateState({ reservationId });
+      const reservations = reservationResult.data?.reservations || [];
+      if (reservations.length === 0) throw new Error('No reservations returned from server');
+      
+      const reservationIds = reservations.map((r: any) => r.id);
+      console.log('✅ Reserved traits:', reservationIds);
+      updateState({ reservationId: reservationIds[0] }); // Store first for legacy compatibility
 
       // Build ONE transaction with ALL payments (SOL + SPL tokens combined)
       updateState({ step: 'payment_validating', progress: 25 });
@@ -254,7 +257,7 @@ export function EnhancedPurchaseFlow({ selectedNFT, selectedTraits, onSuccess, o
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          reservationId,
+          reservationIds: reservationIds,
           walletAddress: publicKey.toString(),
           assetId: selectedNFT.address,
           payments: paymentGroups.map(g => ({ token: g.token, amount: g.amount })),
@@ -280,7 +283,7 @@ export function EnhancedPurchaseFlow({ selectedNFT, selectedTraits, onSuccess, o
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          reservationId,
+          reservationIds: reservationIds,
           signedTransaction: Buffer.from(signedTx.serialize()).toString('base64')
         })
       });

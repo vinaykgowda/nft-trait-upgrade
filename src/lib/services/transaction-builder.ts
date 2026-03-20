@@ -554,6 +554,8 @@ export class TransactionBuilder {
   async sendAndConfirmTransaction(
     partiallySignedTransaction: { transaction: Transaction; requiredSignatures: string[]; delegateSignatures: string[] }
   ): Promise<TransactionResult> {
+    let signature: string | undefined;
+    
     try {
       const { transaction } = partiallySignedTransaction;
       
@@ -582,7 +584,7 @@ export class TransactionBuilder {
       const rawTransaction = transaction.serialize();
       console.log('📡 Serialized transaction size:', rawTransaction.length, 'bytes');
       
-      const signature = await this.connection.sendRawTransaction(rawTransaction, {
+      signature = await this.connection.sendRawTransaction(rawTransaction, {
         skipPreflight: false,
         preflightCommitment: 'confirmed',
         maxRetries: 3,
@@ -590,32 +592,80 @@ export class TransactionBuilder {
 
       console.log('📡 Transaction sent, waiting for confirmation:', signature);
 
-      const confirmationPromise = this.connection.confirmTransaction(signature, 'confirmed');
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Transaction confirmation timeout')), 30000)
-      );
+      // SECURITY FIX: Use longer timeout and poll for status instead of racing
+      // This prevents false negatives where tx succeeds but we timeout
+      const maxWaitTime = 60000; // 60 seconds
+      const pollInterval = 2000; // 2 seconds
+      const startTime = Date.now();
       
-      const confirmation = await Promise.race([confirmationPromise, timeoutPromise]) as any;
-      
-      if (confirmation.value?.err) {
-        const errorDetails = JSON.stringify(confirmation.value.err);
-        console.error('❌ Transaction failed on-chain:', errorDetails);
-        throw new Error(`Transaction failed: ${errorDetails}`);
+      while (Date.now() - startTime < maxWaitTime) {
+        const status = await this.connection.getSignatureStatus(signature);
+        
+        if (status.value?.confirmationStatus === 'confirmed' || 
+            status.value?.confirmationStatus === 'finalized') {
+          
+          if (status.value.err) {
+            const errorDetails = JSON.stringify(status.value.err);
+            console.error('❌ Transaction failed on-chain:', errorDetails);
+            throw new Error(`Transaction failed: ${errorDetails}`);
+          }
+          
+          console.log('✅ Transaction confirmed:', signature);
+          return { 
+            success: true, 
+            signature,
+            paymentExecuted: true,
+            updateExecuted: true
+          };
+        }
+        
+        // Transaction still pending, wait before polling again
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
       }
-
-      console.log('✅ Transaction confirmed:', signature);
-
-      return { 
-        success: true, 
-        signature,
-        paymentExecuted: true,
-        updateExecuted: true
-      };
+      
+      // Timeout reached - check one final time
+      const finalStatus = await this.connection.getSignatureStatus(signature);
+      if (finalStatus.value?.confirmationStatus === 'confirmed' || 
+          finalStatus.value?.confirmationStatus === 'finalized') {
+        
+        if (finalStatus.value.err) {
+          throw new Error(`Transaction failed: ${JSON.stringify(finalStatus.value.err)}`);
+        }
+        
+        console.log('✅ Transaction confirmed (final check):', signature);
+        return { 
+          success: true, 
+          signature,
+          paymentExecuted: true,
+          updateExecuted: true
+        };
+      }
+      
+      // Transaction not confirmed after max wait time
+      // CRITICAL: Return the signature so caller can track it
+      console.warn('⚠️ Transaction confirmation timeout - signature:', signature);
+      throw new Error(`TIMEOUT_WITH_SIGNATURE:${signature}`);
+      
     } catch (error) {
       console.error('❌ Transaction execution failed:', error);
+      
+      // Extract signature from timeout error if present
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      if (errorMessage.startsWith('TIMEOUT_WITH_SIGNATURE:')) {
+        const timeoutSignature = errorMessage.split(':')[1];
+        return {
+          success: false,
+          signature: timeoutSignature,
+          error: 'Transaction confirmation timeout - check signature status',
+          paymentExecuted: false,
+          updateExecuted: false
+        };
+      }
+      
       return {
         success: false,
-        error: `Transaction failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        signature,
+        error: `Transaction failed: ${errorMessage}`,
         paymentExecuted: false,
         updateExecuted: false
       };

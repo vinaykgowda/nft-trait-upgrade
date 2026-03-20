@@ -159,11 +159,30 @@ export class InventoryManager {
         }
 
         // Decrement remaining_supply on the trait (only if it has limited supply)
-        await client.query(
+        const decrementResult = await client.query(
           `UPDATE traits SET remaining_supply = remaining_supply - 1
-           WHERE id = $1 AND remaining_supply IS NOT NULL AND remaining_supply > 0`,
+           WHERE id = $1 AND remaining_supply IS NOT NULL AND remaining_supply > 0
+           RETURNING remaining_supply`,
           [consumedReservation.trait_id]
         );
+
+        // Verify the decrement actually happened (prevents consuming when supply is 0)
+        if (decrementResult.rowCount === 0) {
+          // Check if trait has limited supply
+          const traitCheck = await client.query(
+            `SELECT total_supply, remaining_supply FROM traits WHERE id = $1`,
+            [consumedReservation.trait_id]
+          );
+          
+          if (traitCheck.rows[0]?.total_supply !== null) {
+            // Has limited supply but couldn't decrement - out of stock
+            return {
+              success: false,
+              error: 'Trait is out of stock',
+            };
+          }
+          // Unlimited supply trait - OK to proceed
+        }
 
         // Create purchase record using domain model conversion
         const purchaseDomain = {
@@ -172,6 +191,7 @@ export class InventoryManager {
           assetId: consumedReservation.asset_id,
           traitId: consumedReservation.trait_id,
           status: 'created' as const,
+          reservationId: reservationId,
         };
         
         const purchase = await this.purchaseRepo.create(
@@ -189,6 +209,87 @@ export class InventoryManager {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to consume reservation',
+      };
+    }
+  }
+
+  /**
+   * Consume multiple reservations atomically (for multi-trait purchases)
+   */
+  async consumeMultipleReservations(
+    reservationIds: string[],
+    purchaseDataTemplate: Partial<Purchase>
+  ): Promise<{
+    success: boolean;
+    purchases?: Purchase[];
+    error?: string;
+  }> {
+    try {
+      return await transaction(async (client) => {
+        const purchases: Purchase[] = [];
+
+        for (const reservationId of reservationIds) {
+          // Consume each reservation
+          const consumedReservation = await this.inventoryRepo.consumeReservation(reservationId, client);
+          
+          if (!consumedReservation) {
+            return {
+              success: false,
+              error: `Reservation ${reservationId} not found, expired, or already consumed`,
+            };
+          }
+
+          // Decrement remaining_supply on the trait (only if it has limited supply)
+          const decrementResult = await client.query(
+            `UPDATE traits SET remaining_supply = remaining_supply - 1
+             WHERE id = $1 AND remaining_supply IS NOT NULL AND remaining_supply > 0
+             RETURNING remaining_supply`,
+            [consumedReservation.trait_id]
+          );
+
+          // Verify the decrement actually happened
+          if (decrementResult.rowCount === 0) {
+            const traitCheck = await client.query(
+              `SELECT total_supply, remaining_supply FROM traits WHERE id = $1`,
+              [consumedReservation.trait_id]
+            );
+            
+            if (traitCheck.rows[0]?.total_supply !== null) {
+              return {
+                success: false,
+                error: `Trait ${consumedReservation.trait_id} is out of stock`,
+              };
+            }
+          }
+
+          // Create purchase record
+          const purchaseDomain = {
+            ...purchaseDataTemplate,
+            walletAddress: consumedReservation.wallet_address,
+            assetId: consumedReservation.asset_id,
+            traitId: consumedReservation.trait_id,
+            status: 'created' as const,
+            reservationId: reservationId,
+          };
+          
+          const purchase = await this.purchaseRepo.create(
+            this.purchaseRepo.fromDomain(purchaseDomain),
+            client
+          );
+
+          purchases.push(this.purchaseRepo.toDomain(purchase));
+        }
+
+        return {
+          success: true,
+          purchases,
+        };
+      });
+    } catch (error) {
+      console.error('Consume multiple reservations error:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to consume reservations',
       };
     }
   }

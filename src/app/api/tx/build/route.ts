@@ -176,6 +176,15 @@ export async function POST(request: NextRequest) {
       return apiResponse.error(`Transaction serialization failed: ${serializationError instanceof Error ? serializationError.message : 'Unknown error'}`, 500);
     }
 
+    // Calculate minimum time remaining across all reservations
+    const timeRemainingValues = await Promise.all(
+      reservations.map(async (r) => {
+        const status = await inventoryManager.getReservationStatus(r.id);
+        return status.timeRemaining || 0;
+      })
+    );
+    const minTimeRemaining = Math.min(...timeRemainingValues);
+
     return apiResponse.success({
       transaction: serializedTransaction,
       reservationId: reservationIdsToProcess[0], // Legacy compatibility
@@ -187,10 +196,7 @@ export async function POST(request: NextRequest) {
         hasMixedPayment: paymentList.length > 1
       },
       traits: traits.map(trait => ({ id: trait.id, name: trait.name, priceAmount: trait.price_amount, priceToken: trait.price_token_id })),
-      timeRemaining: Math.min(...reservations.map(r => {
-        const status = inventoryManager.getReservationStatus(r.id);
-        return status.then(s => s.timeRemaining || 0);
-      })),
+      timeRemaining: minTimeRemaining,
       validation: { hasPaymentInstruction: validation.hasPaymentInstruction, hasUpdateInstruction: validation.hasUpdateInstruction }
     });
   } catch (error) {

@@ -834,8 +834,6 @@ export default function TraitsManagerPage() {
         priceAmount: '0.005',
         totalQuantity: '100',
         requiredTraits: [],
-        artistWallet: '',
-        artistCommission: '0',
         forSale: true,
       });
       setShowBulkUpload(false);

@@ -118,6 +118,10 @@ export default function TraitsManagerPage() {
   const [customEarnerInfo, setCustomEarnerInfo] = useState<{ symbol: string; name: string; decimals: number } | null>(null);
   const [customEarnerError, setCustomEarnerError] = useState('');
 
+  // Conflict selection state
+  const [conflictSlotId, setConflictSlotId] = useState('');
+  const [conflictTraitId, setConflictTraitId] = useState('');
+
   useEffect(() => {
     fetchAvailableTokens();
     fetchTraits();
@@ -1988,6 +1992,98 @@ export default function TraitsManagerPage() {
                       </div>
                     )}
                   </div>
+
+                  {/* Conflicting Traits Section */}
+                  <div className="border border-gray-700 rounded-lg p-4 space-y-3">
+                    <label className="block text-sm font-medium text-green-400">
+                      Conflicting Traits (Optional)
+                    </label>
+                    <p className="text-xs text-gray-400">
+                      Select traits that cannot be applied together with this trait
+                    </p>
+                    
+                    {/* 3-column selector: Trait Type, Trait Value, Add Button */}
+                    <div className="grid grid-cols-12 gap-2">
+                      <div className="col-span-5">
+                        <select
+                          value={conflictSlotId}
+                          onChange={(e) => {
+                            setConflictSlotId(e.target.value);
+                            setConflictTraitId(''); // Reset trait selection when slot changes
+                          }}
+                          className="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-green-400 text-sm"
+                        >
+                          <option value="">Select Trait Type...</option>
+                          {slots.map(slot => (
+                            <option key={slot.id} value={slot.id}>{slot.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      
+                      <div className="col-span-5">
+                        <select
+                          value={conflictTraitId}
+                          onChange={(e) => setConflictTraitId(e.target.value)}
+                          disabled={!conflictSlotId}
+                          className="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-green-400 text-sm disabled:opacity-50"
+                        >
+                          <option value="">Select Trait Value...</option>
+                          {conflictSlotId && traits
+                            .filter(t => t.slotId === conflictSlotId && t.active && !traitForm.conflictingTraits.includes(t.id))
+                            .map(trait => (
+                              <option key={trait.id} value={trait.id}>{trait.name}</option>
+                            ))}
+                        </select>
+                      </div>
+                      
+                      <div className="col-span-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (conflictTraitId && !traitForm.conflictingTraits.includes(conflictTraitId)) {
+                              setTraitForm({
+                                ...traitForm,
+                                conflictingTraits: [...traitForm.conflictingTraits, conflictTraitId]
+                              });
+                              setConflictSlotId('');
+                              setConflictTraitId('');
+                            }
+                          }}
+                          disabled={!conflictTraitId}
+                          className="w-full px-3 py-2 bg-green-600 text-black rounded-md text-sm font-medium hover:bg-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Add
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Display added conflicts */}
+                    {traitForm.conflictingTraits.length > 0 && (
+                      <div className="space-y-2 mt-3">
+                        <p className="text-xs text-gray-500">Added conflicts:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {traitForm.conflictingTraits.map(traitId => {
+                            const trait = traits.find(t => t.id === traitId);
+                            return trait ? (
+                              <span key={traitId} className="inline-flex items-center gap-2 px-3 py-1.5 bg-red-500/20 text-red-300 text-sm rounded border border-red-500/40">
+                                <span>{trait.slotName} - {trait.name}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setTraitForm({
+                                    ...traitForm,
+                                    conflictingTraits: traitForm.conflictingTraits.filter(id => id !== traitId)
+                                  })}
+                                  className="hover:text-red-100 font-bold"
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            ) : null;
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex justify-end space-x-3 pt-6 border-t border-gray-700 mt-6">
@@ -2054,49 +2150,52 @@ export default function TraitsManagerPage() {
                     <p className="text-xs text-gray-400 mt-1">Leave empty to keep current image</p>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-blue-400 mb-1">
-                      Category
-                    </label>
-                    <select
-                      value={traitForm.category}
-                      onChange={(e) => setTraitForm({ ...traitForm, category: e.target.value })}
-                      className="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-blue-400"
-                    >
-                      {categories.map(cat => (
-                        <option key={cat.id} value={cat.name}>{cat.name}</option>
-                      ))}
-                    </select>
-                  </div>
+                  {/* 3-column layout: Category, Rarity, Trait Value */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-blue-400 mb-1">
+                        Category
+                      </label>
+                      <select
+                        value={traitForm.category}
+                        onChange={(e) => setTraitForm({ ...traitForm, category: e.target.value })}
+                        className="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-blue-400"
+                      >
+                        {categories.map(cat => (
+                          <option key={cat.id} value={cat.name}>{cat.name}</option>
+                        ))}
+                      </select>
+                    </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-blue-400 mb-1">
-                      Rarity Tier
-                    </label>
-                    <select
-                      value={traitForm.rarityTierId}
-                      onChange={(e) => setTraitForm({ ...traitForm, rarityTierId: e.target.value })}
-                      className="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-blue-400"
-                    >
-                      {actualRarities.map(rarity => (
-                        <option key={rarity.id} value={rarity.id}>
-                          {rarity.name} ({rarity.weight}% drop rate)
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                    <div>
+                      <label className="block text-sm font-medium text-blue-400 mb-1">
+                        Rarity Tier
+                      </label>
+                      <select
+                        value={traitForm.rarityTierId}
+                        onChange={(e) => setTraitForm({ ...traitForm, rarityTierId: e.target.value })}
+                        className="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-blue-400"
+                      >
+                        {actualRarities.map(rarity => (
+                          <option key={rarity.id} value={rarity.id}>
+                            {rarity.name} ({rarity.weight}% drop rate)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-blue-400 mb-1">
-                      Trait Value
-                    </label>
-                    <input
-                      type="text"
-                      value={traitForm.traitValue}
-                      onChange={(e) => setTraitForm({ ...traitForm, traitValue: e.target.value })}
-                      placeholder="Hoodie"
-                      className="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-blue-400"
-                    />
+                    <div>
+                      <label className="block text-sm font-medium text-blue-400 mb-1">
+                        Trait Value
+                      </label>
+                      <input
+                        type="text"
+                        value={traitForm.traitValue}
+                        onChange={(e) => setTraitForm({ ...traitForm, traitValue: e.target.value })}
+                        placeholder="Hoodie"
+                        className="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-blue-400"
+                      />
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2298,46 +2397,86 @@ export default function TraitsManagerPage() {
                     <p className="text-xs text-gray-400">
                       Select traits that cannot be applied together with this trait
                     </p>
-                    <select
-                      multiple
-                      value={traitForm.conflictingTraits}
-                      onChange={(e) => {
-                        const selected = Array.from(e.target.selectedOptions, option => option.value);
-                        setTraitForm({ ...traitForm, conflictingTraits: selected });
-                      }}
-                      className="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-blue-400 min-h-[120px]"
-                    >
-                      {traits
-                        .filter(t => t.active && t.id !== editingTrait.id)
-                        .map(trait => (
-                          <option key={trait.id} value={trait.id}>
-                            {trait.slotName} - {trait.name}
-                          </option>
-                        ))}
-                    </select>
-                    <p className="text-xs text-gray-500">
-                      Hold Ctrl/Cmd to select multiple traits
-                    </p>
+                    
+                    {/* 3-column selector: Trait Type, Trait Value, Add Button */}
+                    <div className="grid grid-cols-12 gap-2">
+                      <div className="col-span-5">
+                        <select
+                          value={conflictSlotId}
+                          onChange={(e) => {
+                            setConflictSlotId(e.target.value);
+                            setConflictTraitId(''); // Reset trait selection when slot changes
+                          }}
+                          className="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-blue-400 text-sm"
+                        >
+                          <option value="">Select Trait Type...</option>
+                          {slots.map(slot => (
+                            <option key={slot.id} value={slot.id}>{slot.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      
+                      <div className="col-span-5">
+                        <select
+                          value={conflictTraitId}
+                          onChange={(e) => setConflictTraitId(e.target.value)}
+                          disabled={!conflictSlotId}
+                          className="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-blue-400 text-sm disabled:opacity-50"
+                        >
+                          <option value="">Select Trait Value...</option>
+                          {conflictSlotId && traits
+                            .filter(t => t.slotId === conflictSlotId && t.active && t.id !== editingTrait.id && !traitForm.conflictingTraits.includes(t.id))
+                            .map(trait => (
+                              <option key={trait.id} value={trait.id}>{trait.name}</option>
+                            ))}
+                        </select>
+                      </div>
+                      
+                      <div className="col-span-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (conflictTraitId && !traitForm.conflictingTraits.includes(conflictTraitId)) {
+                              setTraitForm({
+                                ...traitForm,
+                                conflictingTraits: [...traitForm.conflictingTraits, conflictTraitId]
+                              });
+                              setConflictSlotId('');
+                              setConflictTraitId('');
+                            }
+                          }}
+                          disabled={!conflictTraitId}
+                          className="w-full px-3 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Add
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Display added conflicts */}
                     {traitForm.conflictingTraits.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {traitForm.conflictingTraits.map(traitId => {
-                          const trait = traits.find(t => t.id === traitId);
-                          return trait ? (
-                            <span key={traitId} className="inline-flex items-center gap-1 px-2 py-1 bg-red-500/20 text-red-300 text-xs rounded border border-red-500/40">
-                              {trait.slotName} - {trait.name}
-                              <button
-                                type="button"
-                                onClick={() => setTraitForm({
-                                  ...traitForm,
-                                  conflictingTraits: traitForm.conflictingTraits.filter(id => id !== traitId)
-                                })}
-                                className="hover:text-red-100"
-                              >
-                                ×
-                              </button>
-                            </span>
-                          ) : null;
-                        })}
+                      <div className="space-y-2 mt-3">
+                        <p className="text-xs text-gray-500">Added conflicts:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {traitForm.conflictingTraits.map(traitId => {
+                            const trait = traits.find(t => t.id === traitId);
+                            return trait ? (
+                              <span key={traitId} className="inline-flex items-center gap-2 px-3 py-1.5 bg-red-500/20 text-red-300 text-sm rounded border border-red-500/40">
+                                <span>{trait.slotName} - {trait.name}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setTraitForm({
+                                    ...traitForm,
+                                    conflictingTraits: traitForm.conflictingTraits.filter(id => id !== traitId)
+                                  })}
+                                  className="hover:text-red-100 font-bold"
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            ) : null;
+                          })}
+                        </div>
                       </div>
                     )}
                   </div>

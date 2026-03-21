@@ -353,13 +353,6 @@ export default function TraitsManagerPage() {
       formData.append('priceTokenId', tokenId); // Use token UUID instead of address
       formData.append('totalSupply', traitForm.totalQuantity);
       formData.append('active', traitForm.forSale.toString());
-      
-      if (traitForm.artistWallet) {
-        formData.append('artistWallet', traitForm.artistWallet);
-      }
-      if (traitForm.artistCommission) {
-        formData.append('artistCommission', traitForm.artistCommission);
-      }
 
       // Add earner token fields if provided
       if (traitForm.earnerToken && traitForm.earnerAmount) {

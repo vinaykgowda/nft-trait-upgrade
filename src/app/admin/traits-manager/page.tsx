@@ -2008,7 +2008,11 @@ export default function TraitsManagerPage() {
                         <select
                           value={conflictSlotId}
                           onChange={(e) => {
-                            setConflictSlotId(e.target.value);
+                            const selectedId = e.target.value;
+                            console.log('Selected slot ID:', selectedId);
+                            console.log('Available slots:', slots);
+                            console.log('Traits with this slotId:', traits.filter(t => t.slotId === selectedId).map(t => ({ name: t.name, slotId: t.slotId })));
+                            setConflictSlotId(selectedId);
                             setConflictTraitId(''); // Reset trait selection when slot changes
                           }}
                           className="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-green-400 text-sm"
@@ -2029,20 +2033,7 @@ export default function TraitsManagerPage() {
                         >
                           <option value="">Select Trait Value...</option>
                           {conflictSlotId && traits
-                            .filter(t => {
-                              const matches = t.slotId === conflictSlotId && t.active && !traitForm.conflictingTraits.includes(t.id);
-                              if (conflictSlotId) {
-                                console.log('Trait filter:', { 
-                                  traitName: t.name, 
-                                  traitSlotId: t.slotId, 
-                                  selectedSlotId: conflictSlotId, 
-                                  matches,
-                                  active: t.active,
-                                  alreadyAdded: traitForm.conflictingTraits.includes(t.id)
-                                });
-                              }
-                              return matches;
-                            })
+                            .filter(t => t.slotId === conflictSlotId && t.active && !traitForm.conflictingTraits.includes(t.id))
                             .map(trait => (
                               <option key={trait.id} value={trait.id}>{trait.name}</option>
                             ))}
@@ -2417,7 +2408,11 @@ export default function TraitsManagerPage() {
                         <select
                           value={conflictSlotId}
                           onChange={(e) => {
-                            setConflictSlotId(e.target.value);
+                            const selectedId = e.target.value;
+                            console.log('Edit - Selected slot ID:', selectedId);
+                            console.log('Edit - Available slots:', slots);
+                            console.log('Edit - Traits with this slotId:', traits.filter(t => t.slotId === selectedId).map(t => ({ name: t.name, slotId: t.slotId })));
+                            setConflictSlotId(selectedId);
                             setConflictTraitId(''); // Reset trait selection when slot changes
                           }}
                           className="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-blue-400 text-sm"
@@ -2438,21 +2433,7 @@ export default function TraitsManagerPage() {
                         >
                           <option value="">Select Trait Value...</option>
                           {conflictSlotId && traits
-                            .filter(t => {
-                              const matches = t.slotId === conflictSlotId && t.active && t.id !== editingTrait.id && !traitForm.conflictingTraits.includes(t.id);
-                              if (conflictSlotId) {
-                                console.log('Edit Trait filter:', { 
-                                  traitName: t.name, 
-                                  traitSlotId: t.slotId, 
-                                  selectedSlotId: conflictSlotId, 
-                                  matches,
-                                  active: t.active,
-                                  isEditingTrait: t.id === editingTrait.id,
-                                  alreadyAdded: traitForm.conflictingTraits.includes(t.id)
-                                });
-                              }
-                              return matches;
-                            })
+                            .filter(t => t.slotId === conflictSlotId && t.active && t.id !== editingTrait.id && !traitForm.conflictingTraits.includes(t.id))
                             .map(trait => (
                               <option key={trait.id} value={trait.id}>{trait.name}</option>
                             ))}

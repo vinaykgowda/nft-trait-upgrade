@@ -2008,18 +2008,14 @@ export default function TraitsManagerPage() {
                         <select
                           value={conflictSlotId}
                           onChange={(e) => {
-                            const selectedId = e.target.value;
-                            console.log('Selected slot ID:', selectedId);
-                            console.log('Available slots:', slots);
-                            console.log('Traits with this slotId:', traits.filter(t => t.slotId === selectedId).map(t => ({ name: t.name, slotId: t.slotId })));
-                            setConflictSlotId(selectedId);
-                            setConflictTraitId(''); // Reset trait selection when slot changes
+                            setConflictSlotId(e.target.value);
+                            setConflictTraitId('');
                           }}
                           className="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-green-400 text-sm"
                         >
                           <option value="">Select Trait Type...</option>
                           {slots.map(slot => (
-                            <option key={slot.id} value={slot.id}>{slot.name}</option>
+                            <option key={slot.id} value={slot.name}>{slot.name}</option>
                           ))}
                         </select>
                       </div>
@@ -2033,7 +2029,7 @@ export default function TraitsManagerPage() {
                         >
                           <option value="">Select Trait Value...</option>
                           {conflictSlotId && traits
-                            .filter(t => t.slotId === conflictSlotId && t.active && !traitForm.conflictingTraits.includes(t.id))
+                            .filter(t => t.slotName === conflictSlotId && t.active && !traitForm.conflictingTraits.includes(t.id))
                             .map(trait => (
                               <option key={trait.id} value={trait.id}>{trait.name}</option>
                             ))}
@@ -2408,18 +2404,14 @@ export default function TraitsManagerPage() {
                         <select
                           value={conflictSlotId}
                           onChange={(e) => {
-                            const selectedId = e.target.value;
-                            console.log('Edit - Selected slot ID:', selectedId);
-                            console.log('Edit - Available slots:', slots);
-                            console.log('Edit - Traits with this slotId:', traits.filter(t => t.slotId === selectedId).map(t => ({ name: t.name, slotId: t.slotId })));
-                            setConflictSlotId(selectedId);
-                            setConflictTraitId(''); // Reset trait selection when slot changes
+                            setConflictSlotId(e.target.value);
+                            setConflictTraitId('');
                           }}
                           className="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-blue-400 text-sm"
                         >
                           <option value="">Select Trait Type...</option>
                           {slots.map(slot => (
-                            <option key={slot.id} value={slot.id}>{slot.name}</option>
+                            <option key={slot.id} value={slot.name}>{slot.name}</option>
                           ))}
                         </select>
                       </div>
@@ -2433,7 +2425,7 @@ export default function TraitsManagerPage() {
                         >
                           <option value="">Select Trait Value...</option>
                           {conflictSlotId && traits
-                            .filter(t => t.slotId === conflictSlotId && t.active && t.id !== editingTrait.id && !traitForm.conflictingTraits.includes(t.id))
+                            .filter(t => t.slotName === conflictSlotId && t.active && t.id !== editingTrait.id && !traitForm.conflictingTraits.includes(t.id))
                             .map(trait => (
                               <option key={trait.id} value={trait.id}>{trait.name}</option>
                             ))}

@@ -1135,17 +1135,6 @@ export default function TraitsManagerPage() {
             <div className="flex justify-between items-center">
               <div className="flex items-center space-x-4">
                 <select
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-green-400"
-                >
-                  <option value="All">All Categories</option>
-                  {categories.map(cat => (
-                    <option key={cat.id} value={cat.name}>{cat.name}</option>
-                  ))}
-                </select>
-
-                <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
                   className="bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-green-400"
@@ -1183,7 +1172,10 @@ export default function TraitsManagerPage() {
                 >
                   ➕ Add New Trait
                 </button>
-                <button className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-500 font-bold transition-colors">
+                <button 
+                  onClick={() => setShowBulkUpload(true)}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-500 font-bold transition-colors"
+                >
                   📁 Add Folder of New Traits (Bulk)
                 </button>
               </div>
@@ -1198,6 +1190,38 @@ export default function TraitsManagerPage() {
               >
                 {loading ? '🗑️ Deleting...' : `Delete All Traits (${traits.length})`}
               </button>
+            </div>
+
+            {/* Category Tabs (like marketplace) */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-2">
+              <button
+                onClick={() => setSelectedCategory('All')}
+                className={`px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-colors ${
+                  selectedCategory === 'All'
+                    ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/40'
+                    : 'bg-gray-800 text-gray-400 border border-gray-600 hover:border-gray-500'
+                }`}
+              >
+                ALL
+              </button>
+              {categories.map(cat => {
+                const categoryTraits = traits.filter(t => t.slotName === cat.name);
+                if (categoryTraits.length === 0) return null;
+                
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => setSelectedCategory(cat.name)}
+                    className={`px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-colors ${
+                      selectedCategory === cat.name
+                        ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/40'
+                        : 'bg-gray-800 text-gray-400 border border-gray-600 hover:border-gray-500'
+                    }`}
+                  >
+                    {cat.name.toUpperCase()}
+                  </button>
+                );
+              })}
             </div>
 
             {/* Filter Status */}
@@ -1231,12 +1255,6 @@ export default function TraitsManagerPage() {
                     <>
                       <p className="text-gray-400 text-lg">No traits found in database.</p>
                       <p className="text-gray-500 mb-4">Add your first trait to get started.</p>
-                      <div className="bg-blue-900 border border-blue-600 rounded-lg p-4 max-w-md mx-auto">
-                        <p className="text-blue-300 text-sm mb-2">💡 <strong>Quick Fix:</strong></p>
-                        <p className="text-blue-200 text-xs">
-                          If you uploaded images but don't see traits here, click the "🔧 Repair Upload" button above to convert existing images into traits.
-                        </p>
-                      </div>
                     </>
                   ) : (
                     <>
@@ -1265,62 +1283,87 @@ export default function TraitsManagerPage() {
                   )}
                 </div>
               ) : (
-                <div className="grid grid-cols-9 gap-2">
-                  {sortedTraits.map((trait) => (
-                    <div key={trait.id} className="bg-gray-800 rounded-lg border border-gray-600 overflow-hidden hover:border-green-500 transition-colors">
-                      <div className="aspect-square bg-gray-700 flex items-center justify-center">
-                        {trait.imageLayerUrl ? (
-                          <img
-                            src={trait.imageLayerUrl}
-                            alt={trait.name}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="text-gray-500 text-center">
-                            <div className="text-2xl mb-1">🖼️</div>
-                            <div className="text-xs">No Image</div>
-                          </div>
-                        )}
-                      </div>
-                      
-                      <div className="p-2">
-                        <h4 className="text-green-400 font-medium text-sm mb-1">{trait.name}</h4>
-                        <div className="flex justify-between items-center mb-2">
-                          <p className="text-gray-400 text-xs">{trait.slotName}</p>
-                          <span className={`px-2 py-1 text-xs rounded ${RarityService.getRarityBgColor(trait.rarityTier?.name || 'Common')} ${RarityService.getRarityColor(trait.rarityTier?.name || 'Common')}`}>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                  {sortedTraits.map((trait) => {
+                    const rarityColor = RarityService.getRarityColor(trait.rarityTier?.name || 'Common');
+                    const rarityBgColor = RarityService.getRarityBgColor(trait.rarityTier?.name || 'Common');
+                    
+                    return (
+                      <div key={trait.id} className="bg-gray-800 rounded-lg border border-gray-600 overflow-hidden hover:border-yellow-500 transition-colors">
+                        <div className="aspect-square bg-gray-700 flex items-center justify-center relative">
+                          {trait.imageLayerUrl ? (
+                            <img
+                              src={trait.imageLayerUrl}
+                              alt={trait.name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="text-gray-500 text-center">
+                              <div className="text-2xl mb-1">🖼️</div>
+                              <div className="text-xs">No Image</div>
+                            </div>
+                          )}
+                          
+                          {/* Rarity Badge (top-left like marketplace) */}
+                          <span className={`absolute top-2 left-2 text-[10px] font-semibold px-2 py-1 rounded border ${rarityBgColor} ${rarityColor}`}>
                             {trait.rarityTier?.name || 'Common'}
                           </span>
+                          
+                          {/* Earner Badge (top-right like marketplace) */}
+                          {trait.earnerToken && trait.earnerAmount && (
+                            <span className="absolute top-2 right-2 text-[10px] font-semibold px-2 py-1 rounded border bg-emerald-500/20 text-emerald-300 border-emerald-500/40">
+                              {trait.earnerAmount} {trait.earnerToken.symbol}
+                            </span>
+                          )}
                         </div>
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="text-green-300 text-xs">{trait.priceAmount} {trait.priceToken?.symbol}</span>
-                          <span className={`px-2 py-1 text-xs rounded ${
-                            trait.active 
-                              ? 'bg-green-900 text-green-300' 
-                              : 'bg-red-900 text-red-300'
-                          }`}>
-                            {trait.active ? '✅' : '❌'}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center text-xs text-gray-400 mb-3">
-                          <span>Supply: {trait.remainingSupply}/{trait.totalSupply}</span>
-                        </div>
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={() => handleEditTrait(trait)}
-                            className="flex-1 bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-500 transition-colors"
-                          >
-                            ✏️ Edit
-                          </button>
-                          <button
-                            onClick={() => handleDeleteTrait(trait.id)}
-                            className="flex-1 bg-red-600 text-white px-2 py-1 rounded text-xs hover:bg-red-500 transition-colors"
-                          >
-                            🗑️ Delete
-                          </button>
+                        
+                        <div className="p-3">
+                          <h4 className="text-white font-medium text-sm mb-1 truncate">{trait.name}</h4>
+                          <p className="text-gray-400 text-xs mb-2">{trait.slotName}</p>
+                          
+                          <div className="flex justify-between items-center mb-2">
+                            <div>
+                              <p className="text-gray-500 text-[10px]">Pricing</p>
+                              <p className="text-yellow-400 text-xs font-semibold">
+                                ◆ {trait.priceAmount} {trait.priceToken?.symbol}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-gray-500 text-[10px]">Stock</p>
+                              <p className="text-gray-300 text-xs">
+                                {trait.totalSupply ? `${trait.remainingSupply}/${trait.totalSupply}` : '∞'}
+                              </p>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center justify-between mb-3">
+                            <span className={`px-2 py-1 text-xs rounded ${
+                              trait.active 
+                                ? 'bg-green-900 text-green-300' 
+                                : 'bg-red-900 text-red-300'
+                            }`}>
+                              {trait.active ? '✅ On Sale' : '❌ Off Sale'}
+                            </span>
+                          </div>
+                          
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={() => handleEditTrait(trait)}
+                              className="flex-1 bg-blue-600 text-white px-2 py-1.5 rounded text-xs hover:bg-blue-500 transition-colors"
+                            >
+                              ✏️ Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteTrait(trait.id)}
+                              className="flex-1 bg-red-600 text-white px-2 py-1.5 rounded text-xs hover:bg-red-500 transition-colors"
+                            >
+                              🗑️ Delete
+                            </button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

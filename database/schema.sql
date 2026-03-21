@@ -77,6 +77,15 @@ CREATE TABLE traits (
     updated_at TIMESTAMP DEFAULT NOW()
 );
 
+-- Trait conflicts (traits that cannot be applied together)
+CREATE TABLE trait_conflicts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    trait_id UUID REFERENCES traits(id) ON DELETE CASCADE,
+    conflicts_with_trait_id UUID REFERENCES traits(id) ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(trait_id, conflicts_with_trait_id)
+);
+
 -- User management
 CREATE TABLE user_wallets (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

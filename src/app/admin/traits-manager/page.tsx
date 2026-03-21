@@ -88,8 +88,7 @@ export default function TraitsManagerPage() {
     priceAmount: '0.005',
     totalQuantity: '10',
     requiredTraits: [] as string[],
-    artistWallet: '',
-    artistCommission: '0',
+    conflictingTraits: [] as string[], // New: conflicting trait IDs
     forSale: true,
     imageFile: null as File | null,
     imagePreview: '',
@@ -105,8 +104,6 @@ export default function TraitsManagerPage() {
     priceAmount: '0.005',
     totalQuantity: '100',
     requiredTraits: [] as string[],
-    artistWallet: '',
-    artistCommission: '0',
     forSale: true,
   });
 
@@ -381,6 +378,22 @@ export default function TraitsManagerPage() {
         throw new Error(errorData.error || 'Failed to add trait');
       }
 
+      const result = await response.json();
+      const newTraitId = result.trait?.id;
+
+      // Save conflicts if any were selected
+      if (newTraitId && traitForm.conflictingTraits.length > 0) {
+        await fetch('/api/admin/traits/conflicts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            traitId: newTraitId,
+            conflictingTraitIds: traitForm.conflictingTraits
+          })
+        });
+      }
+
       // Reset form
       setTraitForm({
         category: categories.length > 0 ? categories[0].name : 'Background',
@@ -391,8 +404,7 @@ export default function TraitsManagerPage() {
         priceAmount: '0.005',
         totalQuantity: '10',
         requiredTraits: [],
-        artistWallet: '',
-        artistCommission: '0',
+        conflictingTraits: [],
         forSale: true,
         imageFile: null,
         imagePreview: '',
@@ -411,8 +423,23 @@ export default function TraitsManagerPage() {
     }
   };
 
-  const handleEditTrait = (trait: Trait) => {
+  const handleEditTrait = async (trait: Trait) => {
     setEditingTrait(trait);
+    
+    // Load conflicts for this trait
+    let conflicts: string[] = [];
+    try {
+      const conflictsRes = await fetch(`/api/admin/traits/conflicts?traitId=${trait.id}`, {
+        credentials: 'include'
+      });
+      if (conflictsRes.ok) {
+        const conflictsData = await conflictsRes.json();
+        conflicts = conflictsData.conflicts || [];
+      }
+    } catch (error) {
+      console.error('Failed to load conflicts:', error);
+    }
+
     setTraitForm({
       category: trait.slotName,
       customName: false,
@@ -422,8 +449,7 @@ export default function TraitsManagerPage() {
       priceAmount: trait.priceAmount, // Already a string, no conversion needed
       totalQuantity: trait.totalSupply?.toString() || '10',
       requiredTraits: [],
-      artistWallet: '',
-      artistCommission: '0',
+      conflictingTraits: conflicts,
       forSale: trait.active,
       imageFile: null,
       imagePreview: trait.imageLayerUrl,
@@ -494,6 +520,17 @@ export default function TraitsManagerPage() {
         throw new Error(errorData.error || 'Failed to update trait');
       }
 
+      // Save conflicts
+      await fetch('/api/admin/traits/conflicts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          traitId: editingTrait.id,
+          conflictingTraitIds: traitForm.conflictingTraits
+        })
+      });
+
       // Reset form
       setEditingTrait(null);
       setShowEditTrait(false);
@@ -506,8 +543,7 @@ export default function TraitsManagerPage() {
         priceAmount: '0.005',
         totalQuantity: '10',
         requiredTraits: [],
-        artistWallet: '',
-        artistCommission: '0',
+        conflictingTraits: [],
         forSale: true,
         imageFile: null,
         imagePreview: '',
@@ -735,8 +771,6 @@ export default function TraitsManagerPage() {
         }),
         bulkSettings: {
           category: bulkForm.category,
-          artistWallet: bulkForm.artistWallet,
-          artistCommission: bulkForm.artistCommission ? parseFloat(bulkForm.artistCommission) : undefined,
         }
       };
 
@@ -1597,35 +1631,6 @@ export default function TraitsManagerPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
-                <div>
-                  <label className="block text-sm font-medium text-blue-400 mb-1">
-                    Artist Commission (optional) - Wallet Address
-                  </label>
-                  <input
-                    type="text"
-                    value={bulkForm.artistWallet}
-                    onChange={(e) => setBulkForm({ ...bulkForm, artistWallet: e.target.value })}
-                    placeholder="Wallet Address"
-                    className="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-blue-400"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-blue-400 mb-1">
-                    Percent should be set in number form. Example: 1% should be inputted as 1. (Max 50%)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="50"
-                    value={bulkForm.artistCommission}
-                    onChange={(e) => setBulkForm({ ...bulkForm, artistCommission: e.target.value })}
-                    className="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-blue-400"
-                  />
-                </div>
-              </div>
-
               <div className="mt-6 flex justify-end">
                 <button
                   onClick={handleBulkUpload}
@@ -1681,36 +1686,52 @@ export default function TraitsManagerPage() {
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-green-400 mb-1">
-                      Category
-                    </label>
-                    <select
-                      value={traitForm.category}
-                      onChange={(e) => setTraitForm({ ...traitForm, category: e.target.value })}
-                      className="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-green-400"
-                    >
-                      {categories.map(cat => (
-                        <option key={cat.id} value={cat.name}>{cat.name}</option>
-                      ))}
-                    </select>
-                  </div>
+                  {/* 3-column layout: Category, Rarity, Trait Value */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-green-400 mb-1">
+                        Category
+                      </label>
+                      <select
+                        value={traitForm.category}
+                        onChange={(e) => setTraitForm({ ...traitForm, category: e.target.value })}
+                        className="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-green-400"
+                      >
+                        {categories.map(cat => (
+                          <option key={cat.id} value={cat.name}>{cat.name}</option>
+                        ))}
+                      </select>
+                    </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-green-400 mb-1">
-                      Rarity Tier
-                    </label>
-                    <select
-                      value={traitForm.rarityTierId}
-                      onChange={(e) => setTraitForm({ ...traitForm, rarityTierId: e.target.value })}
-                      className="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-green-400"
-                    >
-                      {actualRarities.map(rarity => (
-                        <option key={rarity.id} value={rarity.id}>
-                          {rarity.name} ({rarity.weight}% drop rate)
-                        </option>
-                      ))}
-                    </select>
+                    <div>
+                      <label className="block text-sm font-medium text-green-400 mb-1">
+                        Rarity Tier
+                      </label>
+                      <select
+                        value={traitForm.rarityTierId}
+                        onChange={(e) => setTraitForm({ ...traitForm, rarityTierId: e.target.value })}
+                        className="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-green-400"
+                      >
+                        {actualRarities.map(rarity => (
+                          <option key={rarity.id} value={rarity.id}>
+                            {rarity.name} ({rarity.weight}% drop rate)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-green-400 mb-1">
+                        Trait Value
+                      </label>
+                      <input
+                        type="text"
+                        value={traitForm.traitValue}
+                        onChange={(e) => setTraitForm({ ...traitForm, traitValue: e.target.value })}
+                        placeholder="Hoodie"
+                        className="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-green-400"
+                      />
+                    </div>
                   </div>
 
                   <div className="flex items-center">
@@ -1724,21 +1745,6 @@ export default function TraitsManagerPage() {
                     <label htmlFor="customName" className="ml-2 block text-sm text-green-400">
                       Use a custom name for the store? (Default: Trait Value)
                     </label>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-green-400 mb-1">
-                        Trait Value (auto-filled from filename)
-                      </label>
-                      <input
-                        type="text"
-                        value={traitForm.traitValue}
-                        onChange={(e) => setTraitForm({ ...traitForm, traitValue: e.target.value })}
-                        placeholder="Hoodie"
-                        className="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-green-400"
-                      />
-                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1792,33 +1798,56 @@ export default function TraitsManagerPage() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-green-400 mb-1">
-                        Artist Commission (optional) - Wallet Address
-                      </label>
-                      <input
-                        type="text"
-                        value={traitForm.artistWallet}
-                        onChange={(e) => setTraitForm({ ...traitForm, artistWallet: e.target.value })}
-                        placeholder="Wallet Address"
-                        className="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-green-400"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-green-400 mb-1">
-                        Percent (Max 50%)
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        max="50"
-                        value={traitForm.artistCommission}
-                        onChange={(e) => setTraitForm({ ...traitForm, artistCommission: e.target.value })}
-                        className="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-green-400"
-                      />
-                    </div>
+                  {/* Conflicting Traits Section */}
+                  <div className="border border-gray-700 rounded-lg p-4 space-y-3">
+                    <label className="block text-sm font-medium text-green-400">
+                      Conflicting Traits (Optional)
+                    </label>
+                    <p className="text-xs text-gray-400">
+                      Select traits that cannot be applied together with this trait
+                    </p>
+                    <select
+                      multiple
+                      value={traitForm.conflictingTraits}
+                      onChange={(e) => {
+                        const selected = Array.from(e.target.selectedOptions, option => option.value);
+                        setTraitForm({ ...traitForm, conflictingTraits: selected });
+                      }}
+                      className="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-green-400 min-h-[120px]"
+                    >
+                      {traits
+                        .filter(t => t.active)
+                        .map(trait => (
+                          <option key={trait.id} value={trait.id}>
+                            {trait.slotName} - {trait.name}
+                          </option>
+                        ))}
+                    </select>
+                    <p className="text-xs text-gray-500">
+                      Hold Ctrl/Cmd to select multiple traits
+                    </p>
+                    {traitForm.conflictingTraits.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {traitForm.conflictingTraits.map(traitId => {
+                          const trait = traits.find(t => t.id === traitId);
+                          return trait ? (
+                            <span key={traitId} className="inline-flex items-center gap-1 px-2 py-1 bg-red-500/20 text-red-300 text-xs rounded border border-red-500/40">
+                              {trait.slotName} - {trait.name}
+                              <button
+                                type="button"
+                                onClick={() => setTraitForm({
+                                  ...traitForm,
+                                  conflictingTraits: traitForm.conflictingTraits.filter(id => id !== traitId)
+                                })}
+                                className="hover:text-red-100"
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ) : null;
+                        })}
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex items-center">
@@ -2266,6 +2295,58 @@ export default function TraitsManagerPage() {
                           placeholder="e.g., 3"
                           className="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-blue-400 text-sm"
                         />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Conflicting Traits Section */}
+                  <div className="border border-gray-700 rounded-lg p-4 space-y-3">
+                    <label className="block text-sm font-medium text-blue-400">
+                      Conflicting Traits (Optional)
+                    </label>
+                    <p className="text-xs text-gray-400">
+                      Select traits that cannot be applied together with this trait
+                    </p>
+                    <select
+                      multiple
+                      value={traitForm.conflictingTraits}
+                      onChange={(e) => {
+                        const selected = Array.from(e.target.selectedOptions, option => option.value);
+                        setTraitForm({ ...traitForm, conflictingTraits: selected });
+                      }}
+                      className="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-blue-400 min-h-[120px]"
+                    >
+                      {traits
+                        .filter(t => t.active && t.id !== editingTrait.id)
+                        .map(trait => (
+                          <option key={trait.id} value={trait.id}>
+                            {trait.slotName} - {trait.name}
+                          </option>
+                        ))}
+                    </select>
+                    <p className="text-xs text-gray-500">
+                      Hold Ctrl/Cmd to select multiple traits
+                    </p>
+                    {traitForm.conflictingTraits.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {traitForm.conflictingTraits.map(traitId => {
+                          const trait = traits.find(t => t.id === traitId);
+                          return trait ? (
+                            <span key={traitId} className="inline-flex items-center gap-1 px-2 py-1 bg-red-500/20 text-red-300 text-xs rounded border border-red-500/40">
+                              {trait.slotName} - {trait.name}
+                              <button
+                                type="button"
+                                onClick={() => setTraitForm({
+                                  ...traitForm,
+                                  conflictingTraits: traitForm.conflictingTraits.filter(id => id !== traitId)
+                                })}
+                                className="hover:text-red-100"
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ) : null;
+                        })}
                       </div>
                     )}
                   </div>

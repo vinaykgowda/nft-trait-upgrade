@@ -170,17 +170,56 @@ export function TraitMarketplace() {
 
   const handleNFTSelect = (nft: CoreAsset) => { setSelectedNFT(nft); setSelectedTraits({}); setPurchaseSuccess(null); };
 
-  const handleTraitSelect = (slotId: string, trait: Trait | null) => {
+  const handleTraitSelect = async (slotId: string, trait: Trait | null) => {
     if (trait && selectedNFT?.attributes) {
       const slot = slots.find(s => s.id === slotId);
       const slotName = slot?.name || '';
       const cur = selectedNFT.attributes.find(a => a.trait_type?.toLowerCase() === slotName.toLowerCase());
+      
+      // Check for duplicate
       if (cur && cur.value?.toLowerCase() === trait.name.toLowerCase()) {
         setDuplicateWarning(`Your NFT already has "${trait.name}" as its ${slotName}. Pick a different one!`);
         setTimeout(() => setDuplicateWarning(null), 4000);
         return;
       }
+
+      // Check for conflicts with NFT's current traits
+      try {
+        // Get trait IDs from NFT's current attributes by matching trait names
+        const nftTraitIds: string[] = [];
+        for (const attr of selectedNFT.attributes) {
+          const matchingTrait = traits.find(
+            t => t.name.toLowerCase() === attr.value?.toLowerCase() &&
+                 t.slotId === slots.find(s => s.name.toLowerCase() === attr.trait_type?.toLowerCase())?.id
+          );
+          if (matchingTrait) {
+            nftTraitIds.push(matchingTrait.id);
+          }
+        }
+
+        // Check if selected trait conflicts with any of the NFT's traits
+        const conflictResponse = await fetch('/api/traits/check-conflict', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ traitId: trait.id, nftTraitIds })
+        });
+
+        if (conflictResponse.ok) {
+          const conflictData = await conflictResponse.json();
+          if (conflictData.hasConflict) {
+            setDuplicateWarning(
+              `⚠️ Conflict detected! "${trait.name}" cannot be applied because your NFT has "${conflictData.conflictingTrait.name}" (${conflictData.conflictingTrait.slotName}). These traits are incompatible.`
+            );
+            setTimeout(() => setDuplicateWarning(null), 6000);
+            return;
+          }
+        }
+      } catch (error) {
+        console.error('Error checking trait conflict:', error);
+        // Continue anyway if conflict check fails
+      }
     }
+    
     setDuplicateWarning(null);
     setSelectedTraits(prev => { const u = { ...prev }; if (trait) u[slotId] = trait; else delete u[slotId]; return u; });
   };

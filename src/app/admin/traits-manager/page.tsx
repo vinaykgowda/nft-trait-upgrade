@@ -2028,22 +2028,11 @@ export default function TraitsManagerPage() {
                           className="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-green-400 text-sm disabled:opacity-50"
                         >
                           <option value="">Select Trait Value...</option>
-                          {(() => {
-                            if (!conflictSlotId) return null;
-                            console.log('=== FILTERING TRAITS ===');
-                            console.log('Selected slot name:', conflictSlotId);
-                            console.log('Total traits:', traits.length);
-                            console.log('Sample trait:', traits[0]);
-                            const filtered = traits.filter(t => {
-                              console.log(`Trait: ${t.name}, slotName: "${t.slotName}", matches: ${t.slotName === conflictSlotId}, active: ${t.active}`);
-                              return t.slotName === conflictSlotId && t.active && !traitForm.conflictingTraits.includes(t.id);
-                            });
-                            console.log('Filtered count:', filtered.length);
-                            console.log('Filtered traits:', filtered.map(t => t.name));
-                            return filtered.map(trait => (
+                          {conflictSlotId && traits
+                            .filter(t => t.slotName === conflictSlotId && !traitForm.conflictingTraits.includes(t.id))
+                            .map(trait => (
                               <option key={trait.id} value={trait.id}>{trait.name}</option>
-                            ));
-                          })()}
+                            ))}
                         </select>
                       </div>
                       
@@ -2436,7 +2425,7 @@ export default function TraitsManagerPage() {
                         >
                           <option value="">Select Trait Value...</option>
                           {conflictSlotId && traits
-                            .filter(t => t.slotName === conflictSlotId && t.active && t.id !== editingTrait.id && !traitForm.conflictingTraits.includes(t.id))
+                            .filter(t => t.slotName === conflictSlotId && t.id !== editingTrait.id && !traitForm.conflictingTraits.includes(t.id))
                             .map(trait => (
                               <option key={trait.id} value={trait.id}>{trait.name}</option>
                             ))}

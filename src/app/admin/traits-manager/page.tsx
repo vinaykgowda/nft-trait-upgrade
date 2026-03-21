@@ -2029,7 +2029,20 @@ export default function TraitsManagerPage() {
                         >
                           <option value="">Select Trait Value...</option>
                           {conflictSlotId && traits
-                            .filter(t => t.slotId === conflictSlotId && t.active && !traitForm.conflictingTraits.includes(t.id))
+                            .filter(t => {
+                              const matches = t.slotId === conflictSlotId && t.active && !traitForm.conflictingTraits.includes(t.id);
+                              if (conflictSlotId) {
+                                console.log('Trait filter:', { 
+                                  traitName: t.name, 
+                                  traitSlotId: t.slotId, 
+                                  selectedSlotId: conflictSlotId, 
+                                  matches,
+                                  active: t.active,
+                                  alreadyAdded: traitForm.conflictingTraits.includes(t.id)
+                                });
+                              }
+                              return matches;
+                            })
                             .map(trait => (
                               <option key={trait.id} value={trait.id}>{trait.name}</option>
                             ))}
@@ -2425,7 +2438,21 @@ export default function TraitsManagerPage() {
                         >
                           <option value="">Select Trait Value...</option>
                           {conflictSlotId && traits
-                            .filter(t => t.slotId === conflictSlotId && t.active && t.id !== editingTrait.id && !traitForm.conflictingTraits.includes(t.id))
+                            .filter(t => {
+                              const matches = t.slotId === conflictSlotId && t.active && t.id !== editingTrait.id && !traitForm.conflictingTraits.includes(t.id);
+                              if (conflictSlotId) {
+                                console.log('Edit Trait filter:', { 
+                                  traitName: t.name, 
+                                  traitSlotId: t.slotId, 
+                                  selectedSlotId: conflictSlotId, 
+                                  matches,
+                                  active: t.active,
+                                  isEditingTrait: t.id === editingTrait.id,
+                                  alreadyAdded: traitForm.conflictingTraits.includes(t.id)
+                                });
+                              }
+                              return matches;
+                            })
                             .map(trait => (
                               <option key={trait.id} value={trait.id}>{trait.name}</option>
                             ))}

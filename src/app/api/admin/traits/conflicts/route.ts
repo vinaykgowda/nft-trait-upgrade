@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPool } from '@/lib/db';
+import { getPool } from '@/lib/database';
 import { TraitConflictsRepository } from '@/lib/repositories/trait-conflicts';
 
 /**

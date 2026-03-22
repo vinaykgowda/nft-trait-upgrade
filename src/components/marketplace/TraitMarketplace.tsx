@@ -174,10 +174,12 @@ export function TraitMarketplace() {
     if (trait && selectedNFT?.attributes) {
       const slot = slots.find(s => s.id === slotId);
       const slotName = slot?.name || '';
-      const cur = selectedNFT.attributes.find(a => a.trait_type?.toLowerCase() === slotName.toLowerCase());
+      const cur = selectedNFT.attributes.find(a => 
+        a.trait_type && slotName && a.trait_type.toLowerCase() === slotName.toLowerCase()
+      );
       
       // Check for duplicate
-      if (cur && cur.value?.toLowerCase() === trait.name.toLowerCase()) {
+      if (cur && cur.value && trait.name && cur.value.toLowerCase() === trait.name.toLowerCase()) {
         setDuplicateWarning(`Your NFT already has "${trait.name}" as its ${slotName}. Pick a different one!`);
         setTimeout(() => setDuplicateWarning(null), 4000);
         return;
@@ -188,10 +190,16 @@ export function TraitMarketplace() {
         // Get trait IDs from NFT's current attributes by matching trait names
         const nftTraitIds: string[] = [];
         for (const attr of selectedNFT.attributes) {
-          const matchingTrait = traits.find(
-            t => t.name.toLowerCase() === attr.value?.toLowerCase() &&
-                 t.slotId === slots.find(s => s.name.toLowerCase() === attr.trait_type?.toLowerCase())?.id
-          );
+          if (!attr.value || !attr.trait_type) continue;
+          
+          const matchingTrait = traits.find(t => {
+            if (!t.name) return false;
+            const slotMatch = slots.find(s => 
+              s.name && attr.trait_type && s.name.toLowerCase() === attr.trait_type.toLowerCase()
+            );
+            return t.name.toLowerCase() === attr.value.toLowerCase() && t.slotId === slotMatch?.id;
+          });
+          
           if (matchingTrait) {
             nftTraitIds.push(matchingTrait.id);
           }

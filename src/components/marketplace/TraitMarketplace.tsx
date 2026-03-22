@@ -265,7 +265,7 @@ export function TraitMarketplace() {
     setSelectedTraits(prev => { const u = { ...prev }; if (trait) u[slotId] = trait; else delete u[slotId]; return u; });
   };
 
-  const getTraitsForSlot = (slotId: string) => traits.filter(t => t.slotId === slotId);
+  const getTraitsForSlot = (slotId: string) => traits.filter(t => t.slotId === slotId && t.active);
 
   const getTraitChanges = (): TraitChange[] => {
     if (!selectedNFT) return [];

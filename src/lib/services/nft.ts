@@ -70,23 +70,32 @@ export class HeliusNFTService implements NFTService {
 
       console.log(`✅ Fetched ${allAssets.length} total NFTs for wallet ${walletAddress}`);
 
-      return allAssets
-        .filter((asset: any) => {
-          // Filter by collection IDs
-          if (collectionIds.length === 0) return true;
-          
-          return asset.grouping?.some((group: any) => 
-            group.group_key === 'collection' && 
-            collectionIds.includes(group.group_value)
-          );
-        })
-        .map((asset: any) => ({
-          address: asset.id,
-          name: asset.content?.metadata?.name || 'Unknown NFT',
-          image: asset.content?.links?.image || asset.content?.files?.[0]?.uri || '',
-          collection: asset.grouping?.find((g: any) => g.group_key === 'collection')?.group_value,
-          attributes: asset.content?.metadata?.attributes || [],
-        }));
+      // Filter and map NFTs
+      const filteredAssets = allAssets.filter((asset: any) => {
+        // Filter by collection IDs
+        if (collectionIds.length === 0) return true;
+        
+        const hasMatchingCollection = asset.grouping?.some((group: any) => 
+          group.group_key === 'collection' && 
+          collectionIds.includes(group.group_value)
+        );
+        
+        return hasMatchingCollection;
+      });
+
+      console.log(`✅ Filtered to ${filteredAssets.length} NFTs matching collection IDs:`, collectionIds);
+
+      const mappedNFTs = filteredAssets.map((asset: any) => ({
+        address: asset.id,
+        name: asset.content?.metadata?.name || 'Unknown NFT',
+        image: asset.content?.links?.image || asset.content?.files?.[0]?.uri || '',
+        collection: asset.grouping?.find((g: any) => g.group_key === 'collection')?.group_value,
+        attributes: asset.content?.metadata?.attributes || [],
+      }));
+
+      console.log(`✅ Mapped ${mappedNFTs.length} NFTs with complete data`);
+
+      return mappedNFTs;
     } catch (error) {
       console.error('Error fetching user NFTs with Helius:', error);
       // Fall back to basic implementation on error

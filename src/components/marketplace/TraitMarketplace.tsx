@@ -193,11 +193,12 @@ export function TraitMarketplace() {
           if (!attr.value || !attr.trait_type) continue;
           
           const matchingTrait = traits.find(t => {
-            if (!t.name) return false;
+            if (!t.name || !t.slotId) return false;
             const slotMatch = slots.find(s => 
               s.name && attr.trait_type && s.name.toLowerCase() === attr.trait_type.toLowerCase()
             );
-            return t.name.toLowerCase() === attr.value.toLowerCase() && t.slotId === slotMatch?.id;
+            if (!slotMatch) return false;
+            return t.name.toLowerCase() === attr.value.toLowerCase() && t.slotId === slotMatch.id;
           });
           
           if (matchingTrait) {
@@ -205,21 +206,23 @@ export function TraitMarketplace() {
           }
         }
 
-        // Check if selected trait conflicts with any of the NFT's traits
-        const conflictResponse = await fetch('/api/traits/check-conflict', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ traitId: trait.id, nftTraitIds })
-        });
+        // Only check conflicts if we have trait IDs
+        if (nftTraitIds.length > 0) {
+          const conflictResponse = await fetch('/api/traits/check-conflict', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ traitId: trait.id, nftTraitIds })
+          });
 
-        if (conflictResponse.ok) {
-          const conflictData = await conflictResponse.json();
-          if (conflictData.hasConflict) {
-            setDuplicateWarning(
-              `⚠️ Conflict detected! "${trait.name}" cannot be applied because your NFT has "${conflictData.conflictingTrait.name}" (${conflictData.conflictingTrait.slotName}). These traits are incompatible.`
-            );
-            setTimeout(() => setDuplicateWarning(null), 6000);
-            return;
+          if (conflictResponse.ok) {
+            const conflictData = await conflictResponse.json();
+            if (conflictData.hasConflict) {
+              setDuplicateWarning(
+                `⚠️ Conflict detected! "${trait.name}" cannot be applied because your NFT has "${conflictData.conflictingTrait.name}" (${conflictData.conflictingTrait.slotName}). These traits are incompatible.`
+              );
+              setTimeout(() => setDuplicateWarning(null), 6000);
+              return;
+            }
           }
         }
       } catch (error) {

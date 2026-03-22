@@ -18,15 +18,13 @@ export async function GET(request: NextRequest) {
     
     // Get total count for pagination
     const totalCount = await traitRepo.countWithFilters({
-      ...filters,
-      // Load ALL traits (including inactive) for conflict checking
+      ...filters, // Respects ?active=true/false from query params
       hasAvailableSupply: true, // Only count traits with available supply
     });
 
     // Get paginated traits
     const traits = await traitRepo.findWithRelations({
-      ...filters,
-      // Load ALL traits (including inactive) for conflict checking
+      ...filters, // Respects ?active=true/false from query params
       hasAvailableSupply: true,
       limit,
       offset,

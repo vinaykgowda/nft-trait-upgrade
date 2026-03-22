@@ -211,7 +211,7 @@ export function TraitMarketplace() {
             }
             const nameMatch = t.name.toLowerCase() === attr.value.toLowerCase();
             const slotIdMatch = t.slotId === slotMatch.id;
-            console.log(`  Checking trait: ${t.name} (slot: ${t.slotName}), nameMatch: ${nameMatch}, slotIdMatch: ${slotIdMatch}`);
+            console.log(`  Checking trait: ${t.name} (slotId: ${t.slotId}), nameMatch: ${nameMatch}, slotIdMatch: ${slotIdMatch}`);
             return nameMatch && slotIdMatch;
           });
           

@@ -198,72 +198,25 @@ export function TraitMarketplace() {
 
       // Check for conflicts with NFT's current traits
       try {
-        console.log('=== CONFLICT CHECK START ===');
-        console.log('Selected trait:', trait.name, 'ID:', trait.id);
-        console.log('NFT attributes:', selectedNFT.attributes);
-        
-        // Get trait IDs from NFT's current attributes by matching trait names
-        const nftTraitIds: string[] = [];
-        for (const attr of selectedNFT.attributes) {
-          if (!attr.value || !attr.trait_type) continue;
-          
-          console.log(`Trying to match NFT attribute: ${attr.trait_type} = ${attr.value}`);
-          
-          const matchingTrait = traits.find(t => {
-            if (!t.name || !t.slotId) {
-              return false;
-            }
-            const slotMatch = slots.find(s => 
-              s.name && attr.trait_type && s.name.toLowerCase() === attr.trait_type.toLowerCase()
+        const conflictResponse = await fetch('/api/traits/check-conflict', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            traitId: trait.id, 
+            nftAttributes: selectedNFT.attributes 
+          })
+        });
+
+        if (conflictResponse.ok) {
+          const conflictData = await conflictResponse.json();
+          if (conflictData.hasConflict) {
+            setDuplicateWarning(
+              `⚠️ Conflict detected! "${trait.name}" cannot be applied because your NFT has "${conflictData.conflictingTrait.name}" (${conflictData.conflictingTrait.slotName}). These traits are incompatible.`
             );
-            if (!slotMatch) {
-              console.log(`  No slot match for ${attr.trait_type}`);
-              return false;
-            }
-            const nameMatch = t.name.toLowerCase() === attr.value.toLowerCase();
-            const slotIdMatch = t.slotId === slotMatch.id;
-            console.log(`  Checking trait: ${t.name} (slotId: ${t.slotId}, slot: ${slotMatch.name}), nameMatch: ${nameMatch}, slotIdMatch: ${slotIdMatch}`);
-            return nameMatch && slotIdMatch;
-          });
-          
-          if (matchingTrait) {
-            console.log('Found matching trait:', matchingTrait.name, 'ID:', matchingTrait.id);
-            nftTraitIds.push(matchingTrait.id);
-          } else {
-            console.log(`  No matching trait found for ${attr.trait_type} = ${attr.value}`);
+            setTimeout(() => setDuplicateWarning(null), 6000);
+            return;
           }
         }
-
-        console.log('NFT trait IDs:', nftTraitIds);
-
-        // Only check conflicts if we have trait IDs
-        if (nftTraitIds.length > 0) {
-          console.log('Checking conflicts for trait:', trait.id, 'against:', nftTraitIds);
-          const conflictResponse = await fetch('/api/traits/check-conflict', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ traitId: trait.id, nftTraitIds })
-          });
-
-          console.log('Conflict response status:', conflictResponse.status);
-          if (conflictResponse.ok) {
-            const conflictData = await conflictResponse.json();
-            console.log('Conflict data:', conflictData);
-            if (conflictData.hasConflict) {
-              console.log('CONFLICT DETECTED!');
-              setDuplicateWarning(
-                `⚠️ Conflict detected! "${trait.name}" cannot be applied because your NFT has "${conflictData.conflictingTrait.name}" (${conflictData.conflictingTrait.slotName}). These traits are incompatible.`
-              );
-              setTimeout(() => setDuplicateWarning(null), 6000);
-              return;
-            } else {
-              console.log('No conflict found');
-            }
-          }
-        } else {
-          console.log('No NFT trait IDs found, skipping conflict check');
-        }
-        console.log('=== CONFLICT CHECK END ===');
       } catch (error) {
         console.error('Error checking trait conflict:', error);
         // Continue anyway if conflict check fails

@@ -157,7 +157,7 @@ export function TraitMarketplace() {
       setLoading(true);
       const [projectRes, traitsRes, slotsRes] = await Promise.all([
         fetch('/api/project'), 
-        fetch('/api/traits'),
+        fetch('/api/traits?active=true'), // Only load active traits for marketplace
         fetch('/api/trait-slots')
       ]);
       if (!projectRes.ok || !traitsRes.ok || !slotsRes.ok) throw new Error('Failed to fetch data');
@@ -167,7 +167,6 @@ export function TraitMarketplace() {
       
       const loadedTraits = traitsResult.data || [];
       console.log('🔍 LOADED TRAITS:', loadedTraits.length, 'total');
-      console.log('🔍 Active traits:', loadedTraits.filter((t: any) => t.active).length);
       console.log('🔍 Traits by slot:', loadedTraits.reduce((acc: any, t: any) => {
         const slotName = slotsResult.data?.find((s: any) => s.id === t.slotId)?.name || 'Unknown';
         acc[slotName] = (acc[slotName] || 0) + 1;
@@ -275,7 +274,7 @@ export function TraitMarketplace() {
     setSelectedTraits(prev => { const u = { ...prev }; if (trait) u[slotId] = trait; else delete u[slotId]; return u; });
   };
 
-  const getTraitsForSlot = (slotId: string) => traits.filter(t => t.slotId === slotId && t.active);
+  const getTraitsForSlot = (slotId: string) => traits.filter(t => t.slotId === slotId);
 
   const getTraitChanges = (): TraitChange[] => {
     if (!selectedNFT) return [];

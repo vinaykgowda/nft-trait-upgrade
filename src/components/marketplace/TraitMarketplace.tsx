@@ -196,18 +196,30 @@ export function TraitMarketplace() {
         for (const attr of selectedNFT.attributes) {
           if (!attr.value || !attr.trait_type) continue;
           
+          console.log(`Trying to match NFT attribute: ${attr.trait_type} = ${attr.value}`);
+          
           const matchingTrait = traits.find(t => {
-            if (!t.name || !t.slotId) return false;
+            if (!t.name || !t.slotId) {
+              return false;
+            }
             const slotMatch = slots.find(s => 
               s.name && attr.trait_type && s.name.toLowerCase() === attr.trait_type.toLowerCase()
             );
-            if (!slotMatch) return false;
-            return t.name.toLowerCase() === attr.value.toLowerCase() && t.slotId === slotMatch.id;
+            if (!slotMatch) {
+              console.log(`  No slot match for ${attr.trait_type}`);
+              return false;
+            }
+            const nameMatch = t.name.toLowerCase() === attr.value.toLowerCase();
+            const slotIdMatch = t.slotId === slotMatch.id;
+            console.log(`  Checking trait: ${t.name} (slot: ${t.slotName}), nameMatch: ${nameMatch}, slotIdMatch: ${slotIdMatch}`);
+            return nameMatch && slotIdMatch;
           });
           
           if (matchingTrait) {
             console.log('Found matching trait:', matchingTrait.name, 'ID:', matchingTrait.id);
             nftTraitIds.push(matchingTrait.id);
+          } else {
+            console.log(`  No matching trait found for ${attr.trait_type} = ${attr.value}`);
           }
         }
 

@@ -26,33 +26,51 @@ export class HeliusNFTService implements NFTService {
         return this.fetchUserNFTsBasic(walletAddress, collectionIds);
       }
 
-      // Use the exact API format specified by user
-      const response = await fetch(`https://rpc.helius.xyz/?api-key=${this.heliusApiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          id: 'nft-trait-marketplace',
-          method: 'getAssetsByOwner',
-          params: {
-            ownerAddress: walletAddress,
-            page: 1,
-            limit: 1000,
-          },
-        }),
-      });
+      // Fetch ALL pages of NFTs (Helius returns max 1000 per page)
+      let allAssets: any[] = [];
+      let page = 1;
+      let hasMore = true;
 
-      if (!response.ok) {
-        throw new Error(`Helius API error: ${response.status}`);
+      while (hasMore) {
+        const response = await fetch(`https://rpc.helius.xyz/?api-key=${this.heliusApiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 'nft-trait-marketplace',
+            method: 'getAssetsByOwner',
+            params: {
+              ownerAddress: walletAddress,
+              page,
+              limit: 1000,
+            },
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Helius API error: ${response.status}`);
+        }
+
+        const { result } = await response.json();
+        
+        if (!result || !result.items || result.items.length === 0) {
+          hasMore = false;
+          break;
+        }
+
+        allAssets = allAssets.concat(result.items);
+        
+        // Check if there are more pages
+        if (result.items.length < 1000) {
+          hasMore = false;
+        } else {
+          page++;
+        }
       }
 
-      const { result } = await response.json();
-      
-      if (!result || !result.items) {
-        return [];
-      }
+      console.log(`✅ Fetched ${allAssets.length} total NFTs for wallet ${walletAddress}`);
 
-      return result.items
+      return allAssets
         .filter((asset: any) => {
           // Filter by collection IDs
           if (collectionIds.length === 0) return true;

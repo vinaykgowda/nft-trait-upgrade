@@ -156,7 +156,9 @@ export function TraitMarketplace() {
     try {
       setLoading(true);
       const [projectRes, traitsRes, slotsRes] = await Promise.all([
-        fetch('/api/project'), fetch('/api/traits?active=1'), fetch('/api/trait-slots')
+        fetch('/api/project'), 
+        fetch('/api/traits'), // Remove ?active=1 to get ALL traits
+        fetch('/api/trait-slots')
       ]);
       if (!projectRes.ok || !traitsRes.ok || !slotsRes.ok) throw new Error('Failed to fetch data');
       const [projectResult, traitsResult, slotsResult] = await Promise.all([projectRes.json(), traitsRes.json(), slotsRes.json()]);
@@ -211,7 +213,7 @@ export function TraitMarketplace() {
             }
             const nameMatch = t.name.toLowerCase() === attr.value.toLowerCase();
             const slotIdMatch = t.slotId === slotMatch.id;
-            console.log(`  Checking trait: ${t.name} (slotId: ${t.slotId}), nameMatch: ${nameMatch}, slotIdMatch: ${slotIdMatch}`);
+            console.log(`  Checking trait: ${t.name} (slotId: ${t.slotId}, slot: ${slotMatch.name}), nameMatch: ${nameMatch}, slotIdMatch: ${slotIdMatch}`);
             return nameMatch && slotIdMatch;
           });
           

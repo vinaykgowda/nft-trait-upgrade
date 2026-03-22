@@ -30,6 +30,7 @@ export class HeliusNFTService implements NFTService {
       let allAssets: any[] = [];
       let page = 1;
       let hasMore = true;
+      let totalAssets = 0;
 
       while (hasMore) {
         const response = await fetch(`https://rpc.helius.xyz/?api-key=${this.heliusApiKey}`, {
@@ -58,13 +59,26 @@ export class HeliusNFTService implements NFTService {
           break;
         }
 
+        // Store total from first page
+        if (page === 1 && result.total) {
+          totalAssets = result.total;
+          console.log(`📊 Wallet has ${totalAssets} total assets`);
+        }
+
         allAssets = allAssets.concat(result.items);
+        console.log(`📄 Fetched page ${page}: ${result.items.length} assets (total so far: ${allAssets.length})`);
         
         // Check if there are more pages
-        if (result.items.length < 1000) {
-          hasMore = false;
-        } else {
+        // Continue if we haven't fetched all assets yet
+        if (totalAssets > 0 && allAssets.length < totalAssets) {
           page++;
+          hasMore = true;
+        } else if (result.items.length === 1000) {
+          // If we got exactly 1000 items and no total, there might be more
+          page++;
+          hasMore = true;
+        } else {
+          hasMore = false;
         }
       }
 

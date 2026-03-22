@@ -157,7 +157,7 @@ export function TraitMarketplace() {
       setLoading(true);
       const [projectRes, traitsRes, slotsRes] = await Promise.all([
         fetch('/api/project'), 
-        fetch('/api/traits?active=true'), // Only load active traits for marketplace
+        fetch('/api/traits?active=true&limit=1000'), // Load all active traits (increase limit)
         fetch('/api/trait-slots')
       ]);
       if (!projectRes.ok || !traitsRes.ok || !slotsRes.ok) throw new Error('Failed to fetch data');

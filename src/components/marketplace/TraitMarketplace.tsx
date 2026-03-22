@@ -157,14 +157,24 @@ export function TraitMarketplace() {
       setLoading(true);
       const [projectRes, traitsRes, slotsRes] = await Promise.all([
         fetch('/api/project'), 
-        fetch('/api/traits'), // Remove ?active=1 to get ALL traits
+        fetch('/api/traits'),
         fetch('/api/trait-slots')
       ]);
       if (!projectRes.ok || !traitsRes.ok || !slotsRes.ok) throw new Error('Failed to fetch data');
       const [projectResult, traitsResult, slotsResult] = await Promise.all([projectRes.json(), traitsRes.json(), slotsRes.json()]);
       const projectData = projectResult.data || projectResult;
       setCollectionIds(projectData.collectionIds || []);
-      setTraits(traitsResult.data || []);
+      
+      const loadedTraits = traitsResult.data || [];
+      console.log('🔍 LOADED TRAITS:', loadedTraits.length, 'total');
+      console.log('🔍 Active traits:', loadedTraits.filter((t: any) => t.active).length);
+      console.log('🔍 Traits by slot:', loadedTraits.reduce((acc: any, t: any) => {
+        const slotName = slotsResult.data?.find((s: any) => s.id === t.slotId)?.name || 'Unknown';
+        acc[slotName] = (acc[slotName] || 0) + 1;
+        return acc;
+      }, {}));
+      
+      setTraits(loadedTraits);
       setSlots(slotsResult.data || []);
     } catch (err) { console.error('Error fetching data:', err); setError('Failed to load data'); }
     finally { setLoading(false); }

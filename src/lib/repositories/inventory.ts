@@ -87,16 +87,34 @@ export class InventoryReservationRepository extends BaseRepository<InventoryRese
   }
 
   async consumeReservation(id: string, client?: PoolClient): Promise<InventoryReservationRow | null> {
-    const queryText = `
-      UPDATE ${this.tableName}
-      SET status = 'consumed'
-      WHERE id = $1 AND status = 'reserved' AND expires_at > NOW()
-      RETURNING *
-    `;
     const queryFn = client ? client.query.bind(client) : query;
-    
-    const result = await queryFn(queryText, [id]);
-    return result.rows[0] || null;
+
+    // First check if already consumed (idempotent retry support)
+    const existing = await queryFn(
+      `SELECT * FROM ${this.tableName} WHERE id = $1`,
+      [id]
+    );
+    const row = existing.rows[0];
+    if (!row) return null;
+    if (row.status === 'consumed') return row; // already done, treat as success
+
+    // Delete any prior consumed row for the same (wallet, asset, trait) combo
+    // to avoid the unique constraint violation on status='consumed'
+    await queryFn(
+      `DELETE FROM ${this.tableName}
+       WHERE wallet_address = $1 AND asset_id = $2 AND trait_id = $3
+         AND status = 'consumed' AND id != $4`,
+      [row.wallet_address, row.asset_id, row.trait_id, id]
+    );
+
+    const updateResult = await queryFn(
+      `UPDATE ${this.tableName}
+       SET status = 'consumed'
+       WHERE id = $1 AND status = 'reserved' AND expires_at > NOW()
+       RETURNING *`,
+      [id]
+    );
+    return updateResult.rows[0] || null;
   }
 
   async cancelReservation(id: string, client?: PoolClient): Promise<InventoryReservationRow | null> {

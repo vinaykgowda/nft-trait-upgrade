@@ -19,9 +19,11 @@ export function formatPrice(amount: bigint, decimals: number): string {
 }
 
 export function formatDecimalPrice(priceString: string): string {
-  // Convert string to number, then back to string to remove trailing zeros
+  // Use toFixed and strip trailing zeros to avoid floating point issues
   const num = parseFloat(priceString);
-  return num.toString();
+  if (isNaN(num)) return '0';
+  // Format with up to 9 decimal places then strip trailing zeros
+  return parseFloat(num.toFixed(9)).toString();
 }
 
 export function parsePrice(price: string, decimals: number): bigint {

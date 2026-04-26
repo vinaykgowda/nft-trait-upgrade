@@ -65,6 +65,8 @@ export function EnhancedPurchaseFlow({ selectedNFT, selectedTraits, onSuccess, o
       groups[sym].amount += Number(trait.priceAmount);
       groups[sym].traits.push(trait);
     });
+    // Round to 9 decimal places to avoid floating point artifacts
+    Object.values(groups).forEach(g => { g.amount = parseFloat(g.amount.toFixed(9)); });
     return Object.values(groups);
   };
 

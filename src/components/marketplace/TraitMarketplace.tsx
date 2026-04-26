@@ -245,6 +245,9 @@ export function TraitMarketplace() {
       const amt = Number(t.priceAmount);
       if (t.priceToken.symbol === 'SOL') solTotal += amt; else if (t.priceToken.symbol === 'LDZ') ldzTotal += amt;
     });
+    // Round to 9 decimal places to avoid floating point artifacts (e.g. 0.075000000000000001)
+    solTotal = parseFloat(solTotal.toFixed(9));
+    ldzTotal = parseFloat(ldzTotal.toFixed(9));
     if (solTotal > 0 && ldzTotal > 0) return { isMixed: true, ldzAmount: ldzTotal, solAmount: solTotal, displayText: `${ldzTotal} LDZ + ${solTotal} SOL` };
     if (ldzTotal > 0) return { isMixed: false, amount: ldzTotal, symbol: 'LDZ', displayText: `${ldzTotal} LDZ` };
     if (solTotal > 0) return { isMixed: false, amount: solTotal, symbol: 'SOL', displayText: `${solTotal} SOL` };

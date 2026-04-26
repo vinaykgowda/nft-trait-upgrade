@@ -89,6 +89,7 @@ export async function POST(request: NextRequest) {
     const paymentList: Array<{ amount: string; tokenMintAddress?: string; tokenSymbol: string }> = [];
     
     // Calculate actual amounts from database trait prices
+    // Use integer arithmetic to avoid floating point issues (store as lamports/micro-units)
     let solTotal = 0, ldzTotal = 0;
     for (const trait of traits) {
       const amount = parseFloat(trait.price_amount);
@@ -98,6 +99,10 @@ export async function POST(request: NextRequest) {
         ldzTotal += amount;
       }
     }
+
+    // Round to 9 decimal places to avoid floating point artifacts (e.g. 0.075000000000000001)
+    solTotal = parseFloat(solTotal.toFixed(9));
+    ldzTotal = parseFloat(ldzTotal.toFixed(9));
 
     // Build payment list from calculated amounts
     if (solTotal > 0) {

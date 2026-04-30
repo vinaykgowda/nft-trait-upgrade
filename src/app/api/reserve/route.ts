@@ -70,6 +70,21 @@ export async function POST(request: NextRequest) {
             throw new Error(`Insufficient inventory for trait: ${trait.name}`);
           }
         }
+
+        // Check per-wallet apply limit if set
+        const applyLimit = (trait as any).apply_limit_per_wallet;
+        if (applyLimit !== null && applyLimit !== undefined) {
+          const { query } = await import('@/lib/database');
+          const purchaseCountResult = await query(
+            `SELECT COUNT(*) as count FROM purchases 
+             WHERE wallet_address = $1 AND trait_id = $2 AND status IN ('confirmed', 'fulfilled')`,
+            [walletAddress, trait.id]
+          );
+          const purchaseCount = parseInt(purchaseCountResult.rows[0].count);
+          if (purchaseCount >= applyLimit) {
+            throw new Error(`You have reached the maximum limit of ${applyLimit} purchase(s) for trait: ${trait.name}`);
+          }
+        }
       }
 
       // Create reservations for all traits (now safe from race conditions)

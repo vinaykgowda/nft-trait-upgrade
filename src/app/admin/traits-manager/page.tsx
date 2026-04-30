@@ -37,6 +37,7 @@ interface Trait {
   } | null;
   earnerAmount?: string | null;
   active: boolean;
+  applyLimitPerWallet?: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -89,6 +90,7 @@ export default function TraitsManagerPage() {
     totalQuantity: '10',
     requiredTraits: [] as string[],
     conflictingTraits: [] as string[], // New: conflicting trait IDs
+    applyLimitPerWallet: '', // Optional: max applies per wallet
     forSale: true,
     imageFile: null as File | null,
     imagePreview: '',
@@ -357,6 +359,9 @@ export default function TraitsManagerPage() {
       formData.append('priceTokenId', tokenId); // Use token UUID instead of address
       formData.append('totalSupply', traitForm.totalQuantity);
       formData.append('active', traitForm.forSale.toString());
+      if (traitForm.applyLimitPerWallet) {
+        formData.append('applyLimitPerWallet', traitForm.applyLimitPerWallet);
+      }
 
       // Add earner token fields if provided
       if (traitForm.earnerToken && traitForm.earnerAmount) {
@@ -402,6 +407,7 @@ export default function TraitsManagerPage() {
         totalQuantity: '10',
         requiredTraits: [],
         conflictingTraits: [],
+        applyLimitPerWallet: '',
         forSale: true,
         imageFile: null,
         imagePreview: '',
@@ -447,6 +453,7 @@ export default function TraitsManagerPage() {
       totalQuantity: trait.totalSupply?.toString() || '10',
       requiredTraits: [],
       conflictingTraits: conflicts,
+      applyLimitPerWallet: trait.applyLimitPerWallet?.toString() || '',
       forSale: trait.active,
       imageFile: null,
       imagePreview: trait.imageLayerUrl,
@@ -499,6 +506,11 @@ export default function TraitsManagerPage() {
       formData.append('priceTokenId', tokenId); // Use token UUID instead of address
       formData.append('totalSupply', traitForm.totalQuantity);
       formData.append('active', traitForm.forSale.toString());
+      if (traitForm.applyLimitPerWallet) {
+        formData.append('applyLimitPerWallet', traitForm.applyLimitPerWallet);
+      } else {
+        formData.append('applyLimitPerWallet', ''); // Clear the limit
+      }
 
       // Add earner token fields
       if (traitForm.earnerToken && traitForm.earnerAmount) {
@@ -541,6 +553,7 @@ export default function TraitsManagerPage() {
         totalQuantity: '10',
         requiredTraits: [],
         conflictingTraits: [],
+        applyLimitPerWallet: '',
         forSale: true,
         imageFile: null,
         imagePreview: '',
@@ -1858,6 +1871,22 @@ export default function TraitsManagerPage() {
                     </label>
                   </div>
 
+                  {/* Apply Limit Per Wallet (Optional) */}
+                  <div>
+                    <label className="block text-sm font-medium text-green-400 mb-1">
+                      Apply Limit Per Wallet (Optional)
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={traitForm.applyLimitPerWallet}
+                      onChange={(e) => setTraitForm({ ...traitForm, applyLimitPerWallet: e.target.value })}
+                      placeholder="e.g. 5 — leave blank for no limit"
+                      className="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-green-400"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Max number of times a single wallet can purchase this trait</p>
+                  </div>
+
                   {/* Earner Token (Optional) */}
                   <div className="border border-gray-700 rounded-lg p-4 space-y-3">
                     <div className="flex items-center justify-between">
@@ -2254,6 +2283,22 @@ export default function TraitsManagerPage() {
                     <label htmlFor="editForSale" className="ml-2 block text-sm text-blue-400">
                       Is item currently for sale?
                     </label>
+                  </div>
+
+                  {/* Apply Limit Per Wallet (Optional) */}
+                  <div>
+                    <label className="block text-sm font-medium text-blue-400 mb-1">
+                      Apply Limit Per Wallet (Optional)
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={traitForm.applyLimitPerWallet}
+                      onChange={(e) => setTraitForm({ ...traitForm, applyLimitPerWallet: e.target.value })}
+                      placeholder="e.g. 5 — leave blank for no limit"
+                      className="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-blue-400"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Max number of times a single wallet can purchase this trait</p>
                   </div>
 
                   {/* Earner Token (Optional) */}

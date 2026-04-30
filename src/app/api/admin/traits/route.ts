@@ -77,6 +77,7 @@ export async function GET(request: NextRequest) {
       } : null,
       earnerAmount: trait.earner_amount ? formatDecimalPrice(trait.earner_amount) : null,
       active: trait.active,
+      applyLimitPerWallet: (trait as any).apply_limit_per_wallet ?? null,
       createdAt: trait.created_at,
       updatedAt: trait.updated_at,
     }));
@@ -122,6 +123,10 @@ export async function POST(request: NextRequest) {
     const imageFile = formData.get('image') as File;
     const earnerTokenId = formData.get('earnerTokenId') as string | null;
     const earnerAmount = formData.get('earnerAmount') as string | null;
+    const applyLimitPerWalletRaw = formData.get('applyLimitPerWallet') as string | null;
+    const applyLimitPerWallet = applyLimitPerWalletRaw && applyLimitPerWalletRaw !== '' 
+      ? parseInt(applyLimitPerWalletRaw) 
+      : null;
 
     // Basic validation
     if (!name || !traitValue || !priceAmount || !priceTokenId || !totalSupply || !rarityTierId) {
@@ -270,6 +275,7 @@ export async function POST(request: NextRequest) {
     const dbData = {
       ...traitRepo.fromDomain(traitData),
       remaining_supply: parseInt(totalSupply),
+      apply_limit_per_wallet: applyLimitPerWallet,
     };
 
     const newTrait = await traitRepo.create(dbData);

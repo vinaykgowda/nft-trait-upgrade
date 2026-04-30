@@ -28,6 +28,7 @@ export interface Trait {
   earnerToken?: Token;
   earnerAmount?: string;
   active: boolean;
+  applyLimitPerWallet?: number; // Max times a single wallet can apply this trait
 }
 
 export interface RarityTier {

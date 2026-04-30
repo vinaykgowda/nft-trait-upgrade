@@ -110,6 +110,10 @@ export async function PUT(
     const imageFile = formData.get('image') as File | null;
     const earnerTokenId = formData.get('earnerTokenId') as string | null;
     const earnerAmount = formData.get('earnerAmount') as string | null;
+    const applyLimitPerWalletRaw = formData.get('applyLimitPerWallet') as string | null;
+    const applyLimitPerWallet = applyLimitPerWalletRaw && applyLimitPerWalletRaw !== ''
+      ? parseInt(applyLimitPerWalletRaw)
+      : null;
 
     let imageUrl = existingTrait.image_layer_url; // Keep existing image by default
 
@@ -216,6 +220,7 @@ export async function PUT(
       price_amount: priceAmount ? priceAmount : existingTrait.price_amount,
       price_token_id: finalTokenId, // Use converted token ID
       active,
+      apply_limit_per_wallet: applyLimitPerWallet,
     };
 
     // Handle earner fields — allow clearing them by passing empty string

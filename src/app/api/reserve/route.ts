@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { InventoryReservationRepository } from '@/lib/repositories/inventory';
 import { TraitRepository } from '@/lib/repositories/traits';
-import { transaction } from '@/lib/database';
+import { transaction, query as dbQuery } from '@/lib/database';
 import { createApiResponse, getRequestId } from '@/lib/api/response';
 import { validateRequestBody, isValidUUID } from '@/lib/api/validation';
 import { z } from 'zod';
@@ -74,8 +74,7 @@ export async function POST(request: NextRequest) {
         // Check per-wallet apply limit if set
         const applyLimit = (trait as any).apply_limit_per_wallet;
         if (applyLimit !== null && applyLimit !== undefined) {
-          const { query } = await import('@/lib/database');
-          const purchaseCountResult = await query(
+          const purchaseCountResult = await client.query(
             `SELECT COUNT(*) as count FROM purchases 
              WHERE wallet_address = $1 AND trait_id = $2 AND status IN ('confirmed', 'fulfilled')`,
             [walletAddress, trait.id]

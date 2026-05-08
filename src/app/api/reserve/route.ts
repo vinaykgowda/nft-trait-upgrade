@@ -73,13 +73,13 @@ export async function POST(request: NextRequest) {
 
         // Check per-wallet apply limit if set
         const applyLimit = (trait as any).apply_limit_per_wallet;
-        if (applyLimit !== null && applyLimit !== undefined) {
+        if (applyLimit !== null && applyLimit !== undefined && applyLimit > 0) {
           const purchaseCountResult = await client.query(
-            `SELECT COUNT(*) as count FROM purchases 
+            `SELECT COUNT(*)::int as count FROM purchases 
              WHERE wallet_address = $1 AND trait_id = $2 AND status IN ('confirmed', 'fulfilled')`,
             [walletAddress, trait.id]
           );
-          const purchaseCount = parseInt(purchaseCountResult.rows[0].count);
+          const purchaseCount = purchaseCountResult.rows[0]?.count || 0;
           if (purchaseCount >= applyLimit) {
             throw new Error(`You have reached the maximum limit of ${applyLimit} purchase(s) for trait: ${trait.name}`);
           }

@@ -190,6 +190,7 @@ export class TraitRepository extends BaseRepository<TraitRow> {
       SELECT * FROM ${this.tableName} 
       WHERE active = true 
       AND (total_supply IS NULL OR remaining_supply > 0)
+      AND (swap_pool_only = false OR swap_pool_only IS NULL)
       ORDER BY name
     `;
     const queryFn = client ? client.query.bind(client) : query;

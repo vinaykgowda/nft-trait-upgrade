@@ -78,6 +78,8 @@ export async function GET(request: NextRequest) {
       earnerAmount: trait.earner_amount ? formatDecimalPrice(trait.earner_amount) : null,
       active: trait.active,
       applyLimitPerWallet: (trait as any).apply_limit_per_wallet ?? null,
+      swapPoolOnly: (trait as any).swap_pool_only ?? false,
+      ldzEarning: parseFloat((trait as any).ldz_earning || '0'),
       createdAt: trait.created_at,
       updatedAt: trait.updated_at,
     }));

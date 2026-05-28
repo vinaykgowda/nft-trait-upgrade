@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { useRouter } from 'next/navigation';
+import { OrderHistory } from '@/components/reforge/OrderHistory';
 
 interface Profile {
   id: string;
@@ -47,7 +48,7 @@ export default function ProfilePage() {
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
   const [nfts, setNfts] = useState<NFT[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<'wallets' | 'nfts' | 'vouchers'>('wallets');
+  const [tab, setTab] = useState<'wallets' | 'nfts' | 'vouchers' | 'reforge'>('wallets');
   const [walletLabel, setWalletLabel] = useState('');
   const [linkingWallet, setLinkingWallet] = useState(false);
   const [nftsLoading, setNftsLoading] = useState(false);
@@ -167,14 +168,15 @@ export default function ProfilePage() {
 
         {/* Tabs */}
         <div className="flex gap-1 mb-6 bg-white/[0.04] rounded-lg p-1 w-fit">
-          {(['wallets', 'nfts', 'vouchers'] as const).map(t => (
+          {(['wallets', 'nfts', 'vouchers', 'reforge'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)}
               className={`px-4 py-2 rounded-md text-sm font-medium transition ${
                 tab === t ? 'bg-violet-600 text-white' : 'text-white/50 hover:text-white'
               }`}>
               {t === 'wallets' ? `Wallets (${wallets.length})` :
                t === 'nfts' ? `Collection NFTs (${nfts.length})` :
-               `Vouchers (${vouchers.length})`}
+               t === 'vouchers' ? `Vouchers (${vouchers.length})` :
+               'Reforge Orders'}
             </button>
           ))}
         </div>
@@ -271,6 +273,11 @@ export default function ProfilePage() {
               </div>
             ))}
           </div>
+        )}
+
+        {/* Reforge Orders Tab */}
+        {tab === 'reforge' && (
+          <OrderHistory />
         )}
 
       </div>

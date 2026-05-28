@@ -12,6 +12,10 @@ export { GiftBalanceRepository } from './gift-balances';
 export { UserProfileRepository } from './user-profiles';
 export { UserLinkedWalletRepository } from './user-linked-wallets';
 export { TraitVoucherRepository } from './trait-vouchers';
+export { ReforgePackRepository } from './reforge-packs';
+export { ReforgeOrderRepository } from './reforge-orders';
+export { ReforgeCombinationRepository } from './reforge-combinations';
+export { TraitPoolRepository } from './trait-pool';
 
 import { ProjectRepository } from './projects';
 import { TraitRepository } from './traits';
@@ -24,6 +28,10 @@ import { GiftBalanceRepository } from './gift-balances';
 import { UserProfileRepository } from './user-profiles';
 import { UserLinkedWalletRepository } from './user-linked-wallets';
 import { TraitVoucherRepository } from './trait-vouchers';
+import { ReforgePackRepository } from './reforge-packs';
+import { ReforgeOrderRepository } from './reforge-orders';
+import { ReforgeCombinationRepository } from './reforge-combinations';
+import { TraitPoolRepository } from './trait-pool';
 
 // Repository instances (singletons)
 let projectRepo: ProjectRepository;
@@ -37,6 +45,10 @@ let giftBalanceRepo: GiftBalanceRepository;
 let userProfileRepo: UserProfileRepository;
 let userLinkedWalletRepo: UserLinkedWalletRepository;
 let traitVoucherRepo: TraitVoucherRepository;
+let reforgePackRepo: ReforgePackRepository;
+let reforgeOrderRepo: ReforgeOrderRepository;
+let reforgeCombinationRepo: ReforgeCombinationRepository;
+let traitPoolRepo: TraitPoolRepository;
 
 export function getProjectRepository(): ProjectRepository {
   if (!projectRepo) {
@@ -113,4 +125,32 @@ export function getTraitVoucherRepository(): TraitVoucherRepository {
     traitVoucherRepo = new TraitVoucherRepository();
   }
   return traitVoucherRepo;
+}
+
+export function getReforgePackRepository(): ReforgePackRepository {
+  if (!reforgePackRepo) {
+    reforgePackRepo = new ReforgePackRepository();
+  }
+  return reforgePackRepo;
+}
+
+export function getReforgeOrderRepository(): ReforgeOrderRepository {
+  if (!reforgeOrderRepo) {
+    reforgeOrderRepo = new ReforgeOrderRepository();
+  }
+  return reforgeOrderRepo;
+}
+
+export function getReforgeCombinationRepository(): ReforgeCombinationRepository {
+  if (!reforgeCombinationRepo) {
+    reforgeCombinationRepo = new ReforgeCombinationRepository();
+  }
+  return reforgeCombinationRepo;
+}
+
+export function getTraitPoolRepository(): TraitPoolRepository {
+  if (!traitPoolRepo) {
+    traitPoolRepo = new TraitPoolRepository();
+  }
+  return traitPoolRepo;
 }

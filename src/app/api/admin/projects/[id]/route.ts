@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authService } from '@/lib/auth';
 import { getProjectRepository, getAuditLogRepository } from '@/lib/repositories';
+import { EncryptionService } from '@/lib/services/encryption';
+import { query } from '@/lib/database';
 import { z } from 'zod';
 
 const updateProjectSchema = z.object({
@@ -17,6 +19,7 @@ const updateProjectSchema = z.object({
   sellerFeeBasisPoints: z.number().int().min(0).max(10000).optional(),
   collectionSymbol: z.string().min(1).max(20).optional(),
   creatorAddress: z.union([z.string().min(32).max(44), z.literal(''), z.undefined()]).optional(),
+  updateAuthority: z.string().min(1).optional(),
 });
 
 export async function GET(
@@ -40,8 +43,14 @@ export async function GET(
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
 
+    // Check if encrypted_update_authority is set (don't expose the actual value)
+    const hasUpdateAuthority = !!(project as any).encrypted_update_authority;
+
     return NextResponse.json({
-      project: projectRepo.toDomain(project)
+      project: {
+        ...projectRepo.toDomain(project),
+        hasUpdateAuthority,
+      },
     });
 
   } catch (error) {
@@ -90,7 +99,28 @@ export async function PUT(
       );
     }
 
-    const dbData = projectRepo.fromDomain(updateData);
+    // Handle Update Authority key encryption
+    if (updateData.updateAuthority !== undefined) {
+      try {
+        const encryptionService = new EncryptionService();
+        const encryptedKey = encryptionService.encrypt(updateData.updateAuthority);
+        await query(
+          'UPDATE projects SET encrypted_update_authority = $1, updated_at = NOW() WHERE id = $2',
+          [encryptedKey, params.id]
+        );
+      } catch (encError) {
+        console.error('Failed to encrypt update authority key:', encError);
+        return NextResponse.json(
+          { error: 'ENCRYPTION_ERROR', message: 'Failed to encrypt update authority key', retryable: false },
+          { status: 500 }
+        );
+      }
+    }
+
+    // Remove updateAuthority from the data passed to the standard project update
+    const { updateAuthority, ...standardUpdateData } = updateData;
+
+    const dbData = projectRepo.fromDomain(standardUpdateData);
     const updatedProject = await projectRepo.update(params.id, dbData);
 
     if (!updatedProject) {
@@ -98,12 +128,22 @@ export async function PUT(
     }
 
     // Audit log
-    const auditAction = isTreasuryChange ? 'treasury_wallet_changed' : 'project_updated';
+    const isUpdateAuthorityChange = updateAuthority !== undefined;
+    const auditAction = isTreasuryChange ? 'treasury_wallet_changed' 
+      : isUpdateAuthorityChange ? 'update_authority_changed'
+      : 'project_updated';
+    
+    // Don't include the raw key in audit logs
+    const auditChanges = { ...standardUpdateData } as Record<string, any>;
+    if (isUpdateAuthorityChange) {
+      auditChanges.updateAuthority = '[encrypted]';
+    }
+
     await auditRepo.logAction('admin', auditAction, {
       actorId: sessionData.userId,
       payload: {
         projectId: params.id,
-        changes: updateData,
+        changes: auditChanges,
         previousValues: isTreasuryChange ? {
           treasuryWallet: currentProject.treasury_wallet
         } : undefined,
